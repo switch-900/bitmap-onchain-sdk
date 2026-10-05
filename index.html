@@ -1,789 +1,433 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0d1117">
-<meta name="description" content="Bitmap SDK - on-chain Bitmap and Parcel validation, data, geometry, provenance and indexing.">
-<title>Bitmap SDK</title>
-<style>
-:root{--bg:#0d1117;--bg2:#010409;--panel:#161b22;--line:#30363d;--line2:#21262d;--text:#e6edf3;--muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100dvh;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}button,input{font:inherit}button{cursor:pointer}a{color:var(--blue)}code{color:#79c0ff;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px}
-.top{background:var(--bg2);border-bottom:1px solid var(--line2)}.top-inner{width:min(1280px,100%);min-height:58px;margin:auto;padding:10px 18px;display:flex;align-items:center;gap:12px}.repo-mark{width:32px;height:32px;flex:0 0 32px;border-radius:50%;display:grid;place-items:center;background:#f0f6fc;color:#0d1117;font-size:10px;font-weight:900}.repo-name{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.repo-owner{color:var(--muted);font-weight:400}.version{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted);font-size:12px;white-space:nowrap}.version.good{color:#7ee787;border-color:#238636}.version.bad{color:#ff7b72;border-color:#da3633}
-.repo-nav{border-bottom:1px solid var(--line)}.repo-nav-inner{width:min(1280px,100%);margin:auto;padding:0 18px;display:flex;gap:22px;overflow:auto}.repo-nav a{flex:0 0 auto;padding:12px 2px 10px;color:var(--text);text-decoration:none;border-bottom:2px solid transparent}.repo-nav a:first-child{border-bottom-color:#f78166;font-weight:600}
-.shell{width:min(1280px,100%);margin:auto;padding:28px 18px 70px;display:grid;grid-template-columns:210px minmax(0,900px);gap:34px}.sidebar{position:sticky;top:18px;align-self:start}.sidebar-title{margin:0 0 8px;color:var(--muted);font-size:12px;font-weight:600}.sidebar a{display:block;padding:4px 0;color:var(--text);text-decoration:none;font-size:13px}.sidebar a:hover{color:var(--blue)}.readme{min-width:0}
-section{scroll-margin-top:18px}h1{margin:0 0 6px;font-size:32px;line-height:1.25}.subtitle{margin:0 0 16px;font-size:16px;color:var(--muted)}h2{margin:34px 0 14px;padding-bottom:7px;border-bottom:1px solid var(--line);font-size:22px;line-height:1.3}h3{margin:22px 0 8px;font-size:17px}p{margin:0 0 14px}ul{padding-left:24px}li{margin:4px 0}.muted{color:var(--muted)}blockquote{margin:14px 0;padding:0 14px;color:var(--muted);border-left:4px solid var(--line)}pre{margin:10px 0 16px;padding:12px 14px;max-width:100%;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:6px;color:var(--text);white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;tab-size:2}pre.code{white-space:pre}
-.note{margin:14px 0;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--blue);background:var(--panel)}.note.good{border-left-color:var(--green)}.note.warn{border-left-color:var(--orange)}
-.controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.btn{border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:#21262d;color:var(--text);font-weight:600}.btn:hover{background:#30363d}.btn:disabled{opacity:.45;cursor:not-allowed}.btn-green{background:#238636;border-color:#238636}.btn-green:hover{background:#2ea043}.btn-blue{background:#1f6feb;border-color:#1f6feb}.btn-blue:hover{background:#388bfd}.btn-red{color:#ff7b72}
-.ai-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0 8px}.ai-head strong{font-size:16px}.ai-sheet{max-height:520px}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 14px}label{display:grid;gap:4px;color:var(--muted);font-size:12px}input{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:6px;outline:none;background:var(--bg2);color:var(--text)}input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(56,139,253,.15)}
-table{width:100%;border-collapse:collapse;margin:12px 0 20px}th,td{padding:7px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--panel)}.good{color:#7ee787}.bad{color:#ff7b72}.child{display:block;padding:8px 0;border-bottom:1px solid var(--line2);color:var(--blue);text-decoration:none;word-break:break-all}.child:hover{text-decoration:underline}footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
-@media(max-width:800px){.shell{display:block;padding-top:20px;padding-inline:12px}.sidebar{display:none}.fields{grid-template-columns:1fr}.top-inner,.repo-nav-inner{padding-inline:12px}h1{font-size:28px}h2{font-size:20px}.ai-head{align-items:flex-start;flex-direction:column}.ai-head .btn{width:100%}.controls .btn{flex:1 1 auto}}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Switch-900 Build Launcher</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: rgba(255, 255, 255, 0.075);
+      --panel-2: rgba(255, 255, 255, 0.11);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #ffffff;
+      --muted: rgba(255, 255, 255, 0.68);
+      --soft: rgba(255, 255, 255, 0.48);
+      --danger: #ffb4b4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 30rem),
+        radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.08), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 22px;
+    }
+
+    main {
+      width: min(860px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .card {
+      padding: 24px;
+      border-radius: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 90px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(30px, 6vw, 58px);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button,
+    a.button {
+      appearance: none;
+      border: 0;
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-weight: 800;
+      cursor: pointer;
+      background: #ffffff;
+      color: #111111;
+      font-size: 14px;
+    }
+
+    button.secondary,
+    a.button.secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 170px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      padding: 12px;
+      outline: none;
+      resize: vertical;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    #status {
+      min-height: 22px;
+      color: var(--soft);
+      font-size: 13px;
+      word-break: break-word;
+      margin-top: 12px;
+    }
+
+    #status.error {
+      color: var(--danger);
+    }
+
+    .small {
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 740px) {
+      body {
+        padding: 14px;
+      }
+
+      .card {
+        padding: 18px;
+        border-radius: 20px;
+      }
+
+      button,
+      a.button {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
 </head>
+
 <body>
-<header class="top"><div class="top-inner"><div class="repo-mark">SDK</div><div class="repo-name"><span class="repo-owner">bitmap /</span> sdk</div><div id="version" class="version">loading…</div></div></header>
-<nav class="repo-nav"><div class="repo-nav-inner"><a href="#readme">README</a><a href="#api">API</a><a href="#examples">Examples</a><a href="#help">Help</a></div></nav>
-<div class="shell">
-<aside class="sidebar">
-<p class="sidebar-title">Contents</p>
-<a href="#readme">Bitmap SDK</a><a href="#ai">Give this to your AI</a><a href="#quick">Quick start</a><a href="#examples">Examples</a><a href="#bitmap">Bitmap</a><a href="#parcel">Parcels</a><a href="#mondrian">Mondrian</a><a href="#tree">Provenance</a><a href="#reinscriptions">Reinscriptions</a><a href="#storage">IndexedDB</a><a href="#watch">Block watcher</a><a href="#api">API</a><a href="#help">Help children</a><a href="#credits">Dependencies</a>
-</aside>
-<main class="readme">
-<section id="readme">
-<h1>Bitmap SDK</h1>
-<p class="subtitle">On-chain Bitmap and Parcel validation, data, geometry, provenance and indexing.</p>
-<p>One JavaScript API for:</p>
-<ul><li>canonical Bitmap validation</li><li>Parcel validation and tie-breaks</li><li>Mondrian geometry</li><li>parent / child provenance</li><li>same-sat reinscriptions</li><li>shared, versioned IndexedDB indexing when the browser storage context allows it</li><li>live block updates</li></ul>
-<div class="note good"><strong>Bitmap SDK v1 canonical sat:</strong> <code>25483050779204</code><br><br>Latest compatible v1 module:<br><code>/r/sat/25483050779204/at/-1/content</code></div>
-<pre class="code">const {
-  default: BitmapSDK
-} = await import(
-  '/r/sat/25483050779204/at/-1/content'
-)</pre>
-</section>
-<section id="ai">
-<h2>Give this to your AI</h2>
-<p>Most developers probably do not need to learn the full API manually. Copy this sheet into ChatGPT, Claude, Copilot or another coding agent, then describe the Bitmap application you want to build.</p>
-<div class="ai-head"><strong>Bitmap SDK AI coding sheet</strong><button id="copyAi" class="btn btn-green">Copy for AI</button></div>
-<pre id="aiSheet" class="ai-sheet"></pre>
-</section>
-<section id="quick">
-<h2>Quick start</h2>
-<p>For most applications start with <code>getBitmapData()</code>.</p>
-<pre class="code">const {
-  default: BitmapSDK
-} = await import(
-  '/r/sat/25483050779204/at/-1/content'
-)
-
-const data =
-  await BitmapSDK.getBitmapData(
-    177700
-  )
-
-console.log(data.bitmap)
-console.log(data.parcels)
-console.log(data.mondrian)</pre>
-<div class="controls"><button id="copyImport" class="btn">Copy import</button><button id="reloadModule" class="btn">Reload latest</button></div>
-<pre id="moduleStatus">Loading latest Bitmap SDK…</pre>
-</section>
-<section id="examples">
-<h2>Try it</h2>
-<div class="fields"><label>Bitmap<input id="bitmapNumber" value="177700" inputmode="numeric"></label><label>Parcel<input id="parcelNumber" value="0" inputmode="numeric"></label></div>
-<div class="controls"><button id="runBitmap" class="btn btn-blue">Get Bitmap</button><button id="runParcel" class="btn">Validate Parcel</button><button id="runMondrian" class="btn">Mondrian</button><button id="runTree" class="btn">Bitmap Tree</button></div>
-<pre id="output">Nothing run yet.</pre>
-</section>
-<section id="bitmap">
-<h2>Bitmap validation</h2>
-<p>Validate a Bitmap and resolve its canonical inscription.</p>
-<pre class="code">const bitmap =
-  await BitmapSDK.validateBitmap(
-    177700
-  )
-
-const inscriptionId =
-  await BitmapSDK.getBitmapInscriptionId(
-    177700
-  )
-
-const sat =
-  await BitmapSDK.getBitmapSat(
-    177700
-  )</pre>
-<p>For application-ready data:</p>
-<pre class="code">const data =
-  await BitmapSDK.getBitmapData(
-    177700
-  )</pre>
-<p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p>
-</section>
-<section id="parcel">
-<h2>Parcel validation</h2>
-<p>Validate one Parcel:</p>
-<pre class="code">const parcel =
-  await BitmapSDK.validateParcel(
-    0,
-    177700
-  )</pre>
-<p>Get the canonical Parcel inscription:</p>
-<pre class="code">const id =
-  await BitmapSDK.getParcelInscriptionId(
-    0,
-    177700
-  )</pre>
-<p>Get all canonical Parcels:</p>
-<pre class="code">const parcels =
-  await BitmapSDK.getBitmapParcels(
-    177700
-  )</pre>
-<p>Validate a specific inscription as a Parcel:</p>
-<pre class="code">const result =
-  await BitmapSDK.validateParcelInscription(
-    'INSCRIPTION_ID'
-  )</pre>
-<blockquote>Do not assume an inscription is a canonical Parcel simply because its body looks like <code>0.177700.bitmap</code>. The SDK checks the Bitmap relationship, transaction range, direct-parent provenance and canonical tie-break.</blockquote>
-</section>
-<section id="mondrian">
-<h2>Mondrian geometry</h2>
-<p>Return the deterministic Bitmap Parcel layout.</p>
-<pre class="code">const mondrian =
-  await BitmapSDK.getBitmapMondrian(
-    177700,
-    {
-      includeClaims: true
-    }
-  )
-
-for (const slot of mondrian.slots) {
-  console.log(
-    slot.parcelNumber,
-    slot.x,
-    slot.y,
-    slot.size,
-    slot.claimed,
-    slot.inscriptionId
-  )
-}</pre>
-<p>The underlying pattern can also be requested directly:</p>
-<pre class="code">const pattern =
-  await BitmapSDK.getBitmapPattern(
-    177700
-  )</pre>
-</section>
-<section id="tree">
-<h2>Children and provenance</h2>
-<p>Build the parent / child provenance graph of an inscription.</p>
-<pre class="code">const graph =
-  await BitmapSDK.getChildrenTree(
-    inscriptionId,
-    {
-      maxDepth: 3,
-      maxNodes: 1000
-    }
-  )
-
-console.log(graph.nodes)
-console.log(graph.edges)</pre>
-<p>For a complete Bitmap view:</p>
-<pre class="code">const tree =
-  await BitmapSDK.getBitmapTree(
-    177700,
-    {
-      maxDepth: 3,
-      maxNodes: 1000,
-      includeReinscriptions: 'root'
-    }
-  )
-
-console.log(tree.bitmap)
-console.log(tree.parcels)
-console.log(tree.provenance)
-console.log(tree.reinscriptions)</pre>
-<blockquote>The provenance result uses nodes and edges because inscriptions can have multiple parents. Do not assume every inscription relationship is a simple one-parent tree.</blockquote>
-</section>
-<section id="reinscriptions">
-<h2>Reinscriptions</h2>
-<p>Get inscriptions that share the same sat.</p>
-<pre class="code">const chain =
-  await BitmapSDK.getReinscriptionChain(
-    inscriptionId
-  )
-
-if (chain.supported === false) {
-  console.log('Sat index unavailable')
-}</pre>
-<p>Parent / child provenance and same-sat reinscriptions are separate relationships.</p>
-</section>
-<section id="storage">
-<h2>Shared IndexedDB storage</h2>
-<p>Bitmap SDK uses one stable IndexedDB database name, <code>bitmap-sdk</code>, as an optional local Bitmap data layer. This is useful for more than simple caching: compatible apps running in the same browser origin and storage context can reuse data that another Bitmap SDK app has already validated.</p>
-
-<h3>Why this is useful</h3>
-<ul>
-<li><strong>Less repeated network work.</strong> A Bitmap, Parcel set, Mondrian layout or provenance tree that has already been validated can be reused instead of being rebuilt from recursive endpoints every time.</li>
-<li><strong>A common local Bitmap index.</strong> Different inscriptions using Bitmap SDK can converge on the same browser-side data model instead of each app inventing its own incompatible cache.</li>
-<li><strong>Faster second and later apps.</strong> As the local index fills, compatible SDK apps can start with more data already available.</li>
-<li><strong>Validation rules are versioned.</strong> Stored records carry <code>bitmap-sdk-v1.0.1</code>. Bitmap SDK refuses old validation-derived records after the protocol/storage rules change, preventing stale results from silently becoming authoritative.</li>
-<li><strong>Live updates can be shared.</strong> The SDK uses the same storage namespace and a same-origin <code>BroadcastChannel</code> when available, so open SDK apps can react to locally discovered updates.</li>
-</ul>
-
-<div class="note good"><strong>Shared does not mean global.</strong><br>IndexedDB is scoped by the browser's origin/storage partition. Two compatible inscriptions can reuse the same <code>bitmap-sdk</code> database only when the browser gives them the same storage context. A different Ord host, browser profile, private session, or isolated/sandboxed context will have a different database or no persistent storage at all.</div>
-
-<div class="note warn"><strong>Ord iframe caveat.</strong><br>Ord commonly renders inscription previews inside sandboxed iframes. A sandboxed preview may receive an opaque/isolated origin, in which case IndexedDB sharing can be unavailable. Bitmap SDK detects unavailable storage and continues from memory plus recursive Bitcoin/Ord data. Storage is an accelerator, never the source of truth.</div>
-
-<h3>Storage identity</h3>
-<pre class="code">BitmapSDK.STORAGE_DB_NAME
-// "bitmap-sdk"
-
-BitmapSDK.STORAGE_DB_VERSION
-// 2
-
-BitmapSDK.STORAGE_PROTOCOL_VERSION
-// "bitmap-sdk-v1.0.1"</pre>
-
-<h3>Use it</h3>
-<pre class="code">await BitmapSDK.storage.ready()
-
-const status =
-  await BitmapSDK.storage.getStatus()
-
-console.log(status)
-
-// Read already stored canonical data.
-const bitmap =
-  await BitmapSDK.storage.getBitmap(177700)
-
-const parcels =
-  await BitmapSDK.storage.getBitmapParcels(177700)
-
-// Listen for same-context SDK storage updates.
-const unsubscribe =
-  BitmapSDK.storage.subscribe(event => {
-    console.log(event)
-  })
-
-// Later:
-unsubscribe()</pre>
-
-<p><strong>Recommended standard:</strong> Bitmap apps should use the SDK storage layer instead of creating a separate Bitmap database unless they genuinely need application-specific data. App-specific UI state can live elsewhere; canonical Bitmap/Parcel validation data should remain in the SDK's shared schema.</p>
-
-<div class="controls"><button id="storageStatus" class="btn">Storage status</button><button id="storageSubscribe" class="btn">Subscribe</button><button id="storageUnsubscribe" class="btn" disabled>Unsubscribe</button></div>
-<pre id="storageOutput">No storage request yet.</pre>
-</section>
-<section id="watch">
-<h2>Block watcher</h2>
-<p>Watch sequential Bitcoin blocks for new canonical Bitmap and Parcel updates. The default watcher is deliberately fast: it does not deep-fetch every encoded/delegated inscription in a block. Set <code>resolveEncodedParcelCandidates:true</code> only when exhaustive discovery is worth the extra network cost.</p>
-<pre class="code">const watcher =
-  BitmapSDK.watchBlocks(
-    event => {
-      console.log(event.newBitmaps)
-      console.log(event.newParcels)
-    },
-    {
-      pollIntervalMs: 30000,
-      scanCurrent: true,
-      persist: true,
-      resumeFromStorage: true,
-
-      // Fast/default watcher mode. Encoded/delegated
-      // candidates are deferred rather than deep-fetched.
-      resolveEncodedParcelCandidates: false
-    }
-  )
-
-await watcher.ready
-
-// Later:
-watcher.stop()</pre>
-<div class="controls"><button id="watchStart" class="btn btn-green">Start</button><button id="watchNow" class="btn" disabled>Check now</button><button id="watchStop" class="btn btn-red" disabled>Stop</button><button id="watchClear" class="btn">Clear</button></div>
-<pre id="watchOutput">Watcher stopped.</pre>
-</section>
-<section id="api">
-<h2>API</h2>
-<table><thead><tr><th>Area</th><th>Function</th><th>Purpose</th></tr></thead><tbody>
-<tr><td>Bitmap</td><td><code>validateBitmap()</code></td><td>Validate the canonical Bitmap claim.</td></tr>
-<tr><td>Bitmap</td><td><code>getBitmapData()</code></td><td>High-level application-ready Bitmap data.</td></tr>
-<tr><td>Bitmap</td><td><code>getBitmapInscriptionId()</code></td><td>Return the canonical Bitmap inscription ID.</td></tr>
-<tr><td>Bitmap</td><td><code>getBitmapSat()</code></td><td>Return the sat containing the canonical Bitmap.</td></tr>
-<tr><td>Bitmap</td><td><code>syncBitmap()</code></td><td>Refresh Bitmap state and local caches.</td></tr>
-<tr><td>Parcel</td><td><code>getBitmapParcels()</code></td><td>Get canonical Parcel winners for a Bitmap.</td></tr>
-<tr><td>Parcel</td><td><code>validateParcel()</code></td><td>Validate one Parcel number.</td></tr>
-<tr><td>Parcel</td><td><code>validateParcelInscription()</code></td><td>Validate a specific inscription as a Parcel claim.</td></tr>
-<tr><td>Parcel</td><td><code>getParcelInscriptionId()</code></td><td>Return the canonical Parcel inscription ID.</td></tr>
-<tr><td>Parcel</td><td><code>getParcelData()</code></td><td>Return high-level Parcel data.</td></tr>
-<tr><td>Geometry</td><td><code>getBitmapPattern()</code></td><td>Return the deterministic transaction-size pattern.</td></tr>
-<tr><td>Geometry</td><td><code>getBitmapMondrian()</code></td><td>Return deterministic Parcel coordinates and sizes.</td></tr>
-<tr><td>Structure</td><td><code>getChildrenTree()</code></td><td>Build a parent / child provenance graph.</td></tr>
-<tr><td>Structure</td><td><code>getBitmapTree()</code></td><td>Combine Bitmap provenance, Parcels and reinscriptions.</td></tr>
-<tr><td>Structure</td><td><code>getReinscriptionChain()</code></td><td>Return ordered same-sat inscription history.</td></tr>
-<tr><td>Chain</td><td><code>getChainHeight()</code></td><td>Return the current Bitcoin block height.</td></tr>
-<tr><td>Chain</td><td><code>getBlockHash()</code></td><td>Resolve a block hash.</td></tr>
-<tr><td>Chain</td><td><code>scanBlock()</code></td><td>Inspect one block for Bitmap and Parcel claims.</td></tr>
-<tr><td>Chain</td><td><code>getLatestBlockUpdates()</code></td><td>Scan the current tip for updates.</td></tr>
-<tr><td>Chain</td><td><code>watchBlocks()</code></td><td>Watch sequential blocks with resume and reorg support.</td></tr>
-<tr><td>Storage</td><td><code>storage.ready()</code></td><td>Initialise the optional shared same-origin IndexedDB layer.</td></tr>
-<tr><td>Storage</td><td><code>storage.getStatus()</code></td><td>Inspect local index capability and counts.</td></tr>
-<tr><td>Storage</td><td><code>storage.getBitmap()</code></td><td>Read locally stored Bitmap data.</td></tr>
-<tr><td>Storage</td><td><code>storage.getBitmapParcels()</code></td><td>Read locally stored Parcel data.</td></tr>
-<tr><td>Storage</td><td><code>storage.subscribe()</code></td><td>Subscribe to same-context SDK storage/update events.</td></tr>
-<tr><td>Utility</td><td><code>parseBitmapName()</code></td><td>Parse canonical Bitmap claim text.</td></tr>
-<tr><td>Utility</td><td><code>parseParcelName()</code></td><td>Parse Parcel claim text using SDK protocol rules.</td></tr>
-<tr><td>Utility</td><td><code>clearCaches()</code></td><td>Clear in-memory SDK caches.</td></tr>
-</tbody></table>
-</section>
-<section id="help">
-<h2>Help children</h2>
-<p>This main SDK page stays deliberately small and direct. Longer guides, examples and protocol notes can be added as children of this inscription.</p>
-<p>When this page is viewed from its Ord inscription URL, it can discover those children automatically.</p>
-<div class="controls"><button id="loadChildren" class="btn">Load help children</button></div>
-<pre id="childrenStatus">Not checked yet.</pre>
-<div id="children"></div>
-</section>
-<section id="credits">
-<h2>On-chain dependencies</h2>
-<p>Bitmap SDK uses existing on-chain primitives and adds the Bitmap-specific validation, indexing and application API.</p>
-<table><thead><tr><th>Primitive</th><th>Inscription</th></tr></thead><tbody>
-<tr><td>Legacy &lt;942k Bitmap OCI</td><td><code>942b5886158d57fc70cb8fb7d9bd4d37aa95b8b145be1a351326336b087262dbi0</code></td></tr>
-<tr><td>Bitcoin block / inscription parser</td><td><code>bbbb2172ebca174579884df1ad7487196c39e860b3aacdf4e052a33bf5ec31fai0</code></td></tr>
-<tr><td>Mondrian layout primitive</td><td><code>55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0</code></td></tr>
-</tbody></table>
-</section>
-<footer><strong>Bitmap SDK v1</strong><br><br>Canonical sat: <code>25483050779204</code><br>Latest module: <code>/r/sat/25483050779204/at/-1/content</code></footer>
-</main>
-</div>
-<script type="module">
-const BITMAP_SDK_V1_SAT = 25483050779204
-const BITMAP_SDK_SOURCE = `/r/sat/${BITMAP_SDK_V1_SAT}/at/-1/content`
-const $ = id => document.getElementById(id)
-let BitmapSDK = null
-let watcher = null
-let unsubscribeStorage = null
-
-function safeJson(value){
-  const seen = new WeakSet()
-  return JSON.stringify(value,(key,item)=>{
-    if(typeof item === 'bigint') return String(item)
-    if(item instanceof Error) return {name:item.name,message:item.message,stack:item.stack}
-    if(item && typeof item === 'object'){
-      if(seen.has(item)) return '[Circular]'
-      seen.add(item)
-    }
-    return item
-  },2)
-}
-
-async function copyText(text){
-  try{await navigator.clipboard.writeText(text);return true}catch{}
-  const textarea=document.createElement('textarea')
-  textarea.value=text
-  textarea.style.position='fixed'
-  textarea.style.opacity='0'
-  document.body.append(textarea)
-  textarea.select()
-  let success=false
-  try{success=document.execCommand('copy')}catch{}
-  textarea.remove()
-  return success
-}
-
-function readTarget(){
-  const bitmapNumber=Number($('bitmapNumber').value)
-  const parcelNumber=Number($('parcelNumber').value)
-  if(!Number.isSafeInteger(bitmapNumber)||bitmapNumber<0) throw new Error('Bitmap number must be a non-negative whole number.')
-  if(!Number.isSafeInteger(parcelNumber)||parcelNumber<0) throw new Error('Parcel number must be a non-negative whole number.')
-  return {bitmapNumber,parcelNumber}
-}
-
-function importText(){
-  return `const {\n  default: BitmapSDK\n} = await import(\n  '${BITMAP_SDK_SOURCE}'\n)`
-}
-
-async function loadSDK(force=false){
-  if(BitmapSDK && !force) return BitmapSDK
-  $('moduleStatus').textContent=`Loading ${BITMAP_SDK_SOURCE} …`
-  $('version').textContent='loading…'
-  $('version').className='version'
-  try{
-    const imported=await import(BITMAP_SDK_SOURCE)
-    const candidate=imported.default||imported
-    const required=['validateBitmap','validateParcel','getBitmapData','getBitmapMondrian','getBitmapTree','watchBlocks']
-    for(const name of required){
-      if(typeof candidate?.[name] !== 'function') throw new Error(`Loaded SDK is missing ${name}()`)
-    }
-    if(!candidate?.storage) throw new Error('Loaded SDK is missing its storage API.')
-    BitmapSDK=candidate
-    $('version').textContent=candidate.VERSION?`v${candidate.VERSION}`:'loaded'
-    $('version').className='version good'
-    $('moduleStatus').textContent=`Bitmap SDK loaded.\n\n${candidate.SDK_NAME||'Bitmap SDK'}${candidate.VERSION?` v${candidate.VERSION}`:''}\n\n${BITMAP_SDK_SOURCE}`
-    $('moduleStatus').className='good'
-    return candidate
-  }catch(error){
-    BitmapSDK=null
-    $('version').textContent='load failed'
-    $('version').className='version bad'
-    $('moduleStatus').textContent=error?.message||String(error)
-    $('moduleStatus').className='bad'
-    throw error
-  }
-}
-
-async function sdk(){return BitmapSDK||await loadSDK()}
-
-function aiSheetText(){
-return `# Bitmap SDK - AI Coding Sheet
-
-I am building a Bitcoin Ordinals / Bitmap application.
-
-Use Bitmap SDK as the Bitmap and Parcel data layer.
-
-The JavaScript API object is called BitmapSDK.
-
-Do NOT recreate Bitmap validation, Parcel validation,
-Parcel tie-breaks, Mondrian geometry, provenance or local
-Bitmap indexing unless I specifically ask you to modify
-Bitmap SDK itself.
-
-IMPORT
-
-const {
-  default: BitmapSDK
-} = await import(
-  '${BITMAP_SDK_SOURCE}'
-)
-
-This loads the latest compatible Bitmap SDK v1 release.
-
-Canonical Bitmap SDK v1 sat:
-
-${BITMAP_SDK_V1_SAT}
-
-BEST STARTING POINT
-
-For most Bitmap applications begin with:
-
-const data =
-  await BitmapSDK.getBitmapData(
-    177700
-  )
-
-Useful data may include:
-
-data.bitmap
-data.parcels
-data.state
-data.mondrian
-
-BITMAPS
-
-const bitmap =
-  await BitmapSDK.validateBitmap(
-    177700
-  )
-
-const bitmapId =
-  await BitmapSDK.getBitmapInscriptionId(
-    177700
-  )
-
-const bitmapSat =
-  await BitmapSDK.getBitmapSat(
-    177700
-  )
-
-Only treat a Bitmap as canonical when Bitmap SDK says it is.
-
-PARCELS
-
-const parcel =
-  await BitmapSDK.validateParcel(
-    0,
-    177700
-  )
-
-const parcelId =
-  await BitmapSDK.getParcelInscriptionId(
-    0,
-    177700
-  )
-
-const parcels =
-  await BitmapSDK.getBitmapParcels(
-    177700
-  )
-
-const parcelData =
-  await BitmapSDK.getParcelData(
-    0,
-    177700
-  )
-
-const result =
-  await BitmapSDK.validateParcelInscription(
-    'INSCRIPTION_ID'
-  )
-
-Useful Parcel result fields include:
-
-valid
-exists
-claimed
-canonical
-parcelNumber
-bitmapNumber
-inscriptionId
-bitmapInscriptionId
-transactionCount
-
-Do not assume text such as:
-
-0.177700.bitmap
-
-is a canonical Parcel merely because the text looks correct.
-Use Bitmap SDK.
-
-MONDRIAN GEOMETRY
-
-const mondrian =
-  await BitmapSDK.getBitmapMondrian(
-    177700,
-    {
-      includeClaims: true
-    }
-  )
-
-Useful slot fields:
-
-slot.parcelNumber
-slot.x
-slot.y
-slot.size
-slot.claimed
-slot.inscriptionId
-
-const pattern =
-  await BitmapSDK.getBitmapPattern(
-    177700
-  )
-
-Use Bitmap SDK geometry rather than inventing another Bitmap layout.
-
-PARENT / CHILD PROVENANCE
-
-const graph =
-  await BitmapSDK.getChildrenTree(
-    inscriptionId,
-    {
-      maxDepth: 3,
-      maxNodes: 1000
-    }
-  )
-
-Use:
-
-graph.nodes
-graph.edges
-
-An inscription may have multiple parents. Do not assume provenance
-is always a simple one-parent tree.
-
-COMPLETE BITMAP STRUCTURE
-
-const tree =
-  await BitmapSDK.getBitmapTree(
-    177700,
-    {
-      maxDepth: 3,
-      maxNodes: 1000,
-      includeReinscriptions: 'root'
-    }
-  )
-
-Useful fields include:
-
-tree.bitmap
-tree.parcels
-tree.provenance.nodes
-tree.provenance.edges
-tree.reinscriptions
-
-REINSCRIPTIONS
-
-const chain =
-  await BitmapSDK.getReinscriptionChain(
-    inscriptionId
-  )
-
-Same-sat reinscriptions and parent / child provenance are different relationships.
-Some Ord servers may not expose sat-index data.
-Always handle chain.supported === false without breaking the app.
-
-INDEXEDDB / SHARED LOCAL INDEX
-
-Bitmap SDK uses the IndexedDB database name:
-
-bitmap-sdk
-
-Compatible Bitmap SDK apps running in the same browser origin/storage
-context can reuse validated Bitmap, Parcel, Mondrian, provenance and
-watcher data written by another SDK app. This can greatly reduce repeated
-recursive endpoint work across inscriptions.
-
-Storage is NOT global. Different hosts, browser profiles, storage
-partitions and sandboxed/opaque-origin previews do not necessarily share
-the same IndexedDB. Some inscription sandbox contexts may not expose
-persistent IndexedDB at all.
-
-Always treat IndexedDB as an optional accelerator. Bitcoin and Ord
-recursive data remain the source of truth.
-
-await BitmapSDK.storage.ready()
-
-const status =
-  await BitmapSDK.storage.getStatus()
-
-const storedBitmap =
-  await BitmapSDK.storage.getBitmap(177700)
-
-const storedParcels =
-  await BitmapSDK.storage.getBitmapParcels(177700)
-
-Validation-derived records are protocol-versioned. Do not bypass the SDK
-or write arbitrary records directly into the bitmap-sdk database.
-
-BLOCK WATCHER
-
-const watcher =
-  BitmapSDK.watchBlocks(
-    event => {
-      console.log(event.newBitmaps)
-      console.log(event.newParcels)
-    },
-    {
-      pollIntervalMs: 30000,
-      scanCurrent: true,
-      persist: true,
-      resumeFromStorage: true,
-
-      // Fast/default watcher mode. Encoded/delegated
-      // candidates are deferred rather than deep-fetched.
-      resolveEncodedParcelCandidates: false
-    }
-  )
-
-await watcher.ready
-watcher.stop()
-
-ONE-OFF BLOCK SCANS
-
-const block =
-  await BitmapSDK.scanBlock(
-    blockHeight
-  )
-
-const latest =
-  await BitmapSDK.getLatestBlockUpdates()
-
-SYNC
-
-const data =
-  await BitmapSDK.syncBitmap(
-    177700
-  )
-
-IMPORTANT RULES FOR CODE YOU CREATE
-
-1. Use Bitmap SDK instead of rebuilding Bitmap validation.
-2. Use Bitmap SDK instead of rebuilding Parcel validation.
-3. Never assume an inscription is canonical because its body text looks correct.
-4. Use validateBitmap() and validateParcel() when canonicality matters.
-5. Use getBitmapData() as the normal starting point for Bitmap apps.
-6. Use getBitmapMondrian() when Bitmap geometry is required.
-7. Keep parent / child provenance separate from same-sat reinscriptions.
-8. Treat IndexedDB as optional.
-9. Handle Ord recursive endpoint and network failures cleanly.
-10. Keep code suitable for an on-chain HTML / JavaScript inscription.
-11. Prefer relative Ord recursive URLs.
-12. Do not add centralized or external APIs unless I explicitly request them.
-13. Do not bypass SDK validation using assumptions from another Bitmap index.
-14. Do not duplicate Bitmap SDK's lower-level dependencies unless necessary.
-15. Import Bitmap SDK v1 from:
-
-${BITMAP_SDK_SOURCE}
-
-I will now describe the Bitmap application I want to build.
-Use Bitmap SDK through the BitmapSDK API above rather than recreating these systems.`
-}
-
-function renderAiSheet(){$('aiSheet').textContent=aiSheetText()}
-
-async function show(worker){
-  const output=$('output')
-  output.textContent='Running…'
-  try{output.textContent=safeJson(await worker())}
-  catch(error){output.textContent=safeJson({error:error?.message||String(error),stack:error?.stack||null})}
-}
-
-$('runBitmap').onclick=()=>show(async()=>{const api=await sdk();const {bitmapNumber}=readTarget();return await api.getBitmapData(bitmapNumber)})
-$('runParcel').onclick=()=>show(async()=>{const api=await sdk();const {bitmapNumber,parcelNumber}=readTarget();return await api.validateParcel(parcelNumber,bitmapNumber)})
-$('runMondrian').onclick=()=>show(async()=>{const api=await sdk();const {bitmapNumber}=readTarget();return await api.getBitmapMondrian(bitmapNumber,{includeClaims:true})})
-$('runTree').onclick=()=>show(async()=>{const api=await sdk();const {bitmapNumber}=readTarget();return await api.getBitmapTree(bitmapNumber,{maxDepth:3,maxNodes:1000,includeReinscriptions:'root'})})
-
-$('storageStatus').onclick=async()=>{
-  const output=$('storageOutput');output.textContent='Loading…'
-  try{const api=await sdk();await api.storage.ready();output.textContent=safeJson(await api.storage.getStatus())}
-  catch(error){output.textContent=safeJson({error:error?.message||String(error)})}
-}
-$('storageSubscribe').onclick=async()=>{
-  const api=await sdk();unsubscribeStorage?.()
-  unsubscribeStorage=api.storage.subscribe(event=>{$('storageOutput').textContent=safeJson(event)+'\n\n'+$('storageOutput').textContent})
-  $('storageSubscribe').disabled=true;$('storageUnsubscribe').disabled=false;$('storageOutput').textContent='Subscribed to Bitmap SDK storage events.'
-}
-$('storageUnsubscribe').onclick=()=>{unsubscribeStorage?.();unsubscribeStorage=null;$('storageSubscribe').disabled=false;$('storageUnsubscribe').disabled=true;$('storageOutput').textContent='Unsubscribed.'}
-
-function appendWatch(value){
-  const output=$('watchOutput')
-  const text=typeof value==='string'?value:safeJson(value)
-  output.textContent=(output.textContent==='Watcher stopped.'?'':output.textContent+'\n')+text
-  output.scrollTop=output.scrollHeight
-}
-function stopWatcher(){
-  if(watcher){try{watcher.stop()}catch{}watcher=null}
-  $('watchStart').disabled=false;$('watchNow').disabled=true;$('watchStop').disabled=true
-}
-$('watchStart').onclick=async()=>{
-  try{
-    stopWatcher();const api=await sdk();$('watchOutput').textContent='Starting watcher…'
-    watcher=api.watchBlocks(event=>appendWatch(event),{pollIntervalMs:30000,scanCurrent:true,persist:true,resumeFromStorage:true,emitEmptyBlocks:false})
-    $('watchStart').disabled=true;$('watchNow').disabled=false;$('watchStop').disabled=false
-    await watcher.ready
-    appendWatch({type:'watcher-ready',state:watcher.state})
-  }catch(error){appendWatch({type:'error',message:error?.message||String(error)});stopWatcher()}
-}
-$('watchNow').onclick=async()=>{if(!watcher)return;try{await watcher.checkNow()}catch(error){appendWatch({type:'error',message:error?.message||String(error)})}}
-$('watchStop').onclick=()=>{stopWatcher();appendWatch('Watcher stopped.')}
-$('watchClear').onclick=()=>{$('watchOutput').textContent=watcher?'Watcher running.':'Watcher stopped.'}
-
-function selfInscriptionId(){
-  const pathname=location.pathname
-  const content=pathname.match(/\/content\/([0-9a-f]{64}i[0-9]+)/i)
-  if(content)return content[1]
-  const preview=pathname.match(/\/preview\/([0-9a-f]{64}i[0-9]+)/i)
-  if(preview)return preview[1]
-  return null
-}
-
-async function loadChildren(){
-  const parentId=selfInscriptionId();const status=$('childrenStatus');const host=$('children');host.textContent=''
-  if(!parentId){status.textContent='This page is not currently being viewed from an Ord /content/ or /preview/ inscription URL.';return}
-  status.textContent=`Loading children of ${parentId} …`
-  const children=[];const seen=new Set()
-  for(let page=0;page<10000;page++){
-    const path=page===0?`/r/children/${parentId}/inscriptions`:`/r/children/${parentId}/inscriptions/${page}`
-    const response=await fetch(path)
-    if(!response.ok) throw new Error(`${path} returned HTTP ${response.status}`)
-    const data=await response.json();const pageChildren=Array.isArray(data?.children)?data.children:[]
-    for(const child of pageChildren){if(typeof child?.id!=='string'||seen.has(child.id))continue;seen.add(child.id);children.push(child)}
-    if(!data?.more)break
-  }
-  status.textContent=`${children.length} help child${children.length===1?'':'ren'} found.`
-  for(const child of children){
-    const link=document.createElement('a');link.className='child';link.href=`/content/${child.id}`;link.target='_blank';link.rel='noopener noreferrer'
-    const height=Number.isSafeInteger(child.height)?` · block ${child.height}`:''
-    const number=Number.isSafeInteger(child.number)?` · inscription #${child.number}`:''
-    link.textContent=child.id+height+number;host.append(link)
-  }
-}
-$('loadChildren').onclick=()=>loadChildren().catch(error=>{$('childrenStatus').textContent=error?.message||String(error)})
-
-$('copyImport').onclick=async()=>{const button=$('copyImport');const ok=await copyText(importText());button.textContent=ok?'Copied':'Copy failed';setTimeout(()=>button.textContent='Copy import',1200)}
-$('copyAi').onclick=async()=>{const button=$('copyAi');const ok=await copyText(aiSheetText());button.textContent=ok?'Copied for AI':'Copy failed';setTimeout(()=>button.textContent='Copy for AI',1200)}
-$('reloadModule').onclick=()=>loadSDK(true).catch(()=>{})
-
-renderAiSheet()
-loadSDK().catch(()=>{})
-if(selfInscriptionId()) loadChildren().catch(()=>{})
-</script>
+  <main>
+    <section class="card">
+      <div class="eyebrow">GitHub Pages → ordinals.com</div>
+
+      <h1>Ordinal Build Launcher</h1>
+
+      <p>
+        This page automatically checks for <code>/build/index.html</code>.
+        If it exists, it launches it into the latest Ordinal receiver on sat
+        <code>25483050759410</code>.
+      </p>
+
+      <p>
+        The build is passed through <code>window.name</code>, then this same tab
+        redirects to <code>ordinals.com</code>. No iframe. No popup.
+      </p>
+
+      <div class="actions">
+        <button id="launch">Launch build now</button>
+        <button id="check" class="secondary">Check build</button>
+        <button id="clear-name" class="secondary">Clear window.name</button>
+        <a
+          class="button secondary"
+          href="https://ordinals.com/r/sat/25483050759410/at/-1/content"
+          target="_blank"
+          rel="noopener"
+        >
+          Open receiver
+        </a>
+      </div>
+
+      <div id="status">Checking for /build/index.html...</div>
+    </section>
+
+    <section class="card">
+      <p>
+        Quick paste test
+      </p>
+
+      <textarea
+        id="manual-html"
+        placeholder="Paste HTML here to launch pasted code instead of /build/index.html"
+      ></textarea>
+
+      <div class="actions">
+        <button id="launch-manual" class="secondary">Launch pasted HTML</button>
+      </div>
+
+      <p class="small">
+        Normal use: replace <code>/build/index.html</code> with the app you want to test.
+        If that file exists, this launcher will auto-load it.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var RECEIVER_URL = "https://ordinals.com/r/sat/25483050759410/at/-1/content";
+      var BUILD_ENTRY = "./build/index.html";
+
+      /*
+        true = automatically launch /build/index.html if it exists.
+      */
+      var AUTO_LAUNCH_IF_BUILD_EXISTS = true;
+
+      var launchBtn = document.getElementById("launch");
+      var checkBtn = document.getElementById("check");
+      var clearNameBtn = document.getElementById("clear-name");
+      var launchManualBtn = document.getElementById("launch-manual");
+      var manualHtml = document.getElementById("manual-html");
+      var statusEl = document.getElementById("status");
+
+      function setStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.className = isError ? "error" : "";
+      }
+
+      function setBusy(isBusy) {
+        launchBtn.disabled = isBusy;
+        checkBtn.disabled = isBusy;
+        launchManualBtn.disabled = isBusy;
+      }
+
+      function bytes(text) {
+        return new TextEncoder().encode(String(text || "")).length;
+      }
+
+      function cacheBust(url) {
+        var u = new URL(url, window.location.href);
+        u.searchParams.set("t", Date.now());
+        return u.href;
+      }
+
+      function getBuildUrl() {
+        return new URL(BUILD_ENTRY, window.location.href).href;
+      }
+
+      async function fetchBuildHtml(options) {
+        var silent = options && options.silent;
+        var buildUrl = getBuildUrl();
+
+        if (!silent) {
+          setStatus("Fetching " + buildUrl);
+        }
+
+        var response = await fetch(cacheBust(buildUrl), {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error("No build found at " + BUILD_ENTRY + ". HTTP " + response.status);
+        }
+
+        var html = await response.text();
+
+        if (!html.trim()) {
+          throw new Error(BUILD_ENTRY + " exists but is empty.");
+        }
+
+        return {
+          html: html,
+          buildUrl: buildUrl
+        };
+      }
+
+      function makePayload(html, meta) {
+        return {
+          type: "ordinal-window-name-render",
+          version: "1.0.0",
+          html: html,
+          source: window.location.href,
+          buildUrl: meta && meta.buildUrl ? meta.buildUrl : "manual-paste",
+          receiver: RECEIVER_URL,
+          createdAt: new Date().toISOString()
+        };
+      }
+
+      function redirectWithPayload(payload) {
+        var encoded = JSON.stringify(payload);
+        var size = bytes(encoded);
+
+        window.name = encoded;
+
+        setStatus(
+          "Payload ready: " +
+          size.toLocaleString() +
+          " bytes. Redirecting to ordinals.com..."
+        );
+
+        window.location.href = RECEIVER_URL + "#ordinal-window-loader";
+      }
+
+      async function checkBuild() {
+        try {
+          setBusy(true);
+
+          var build = await fetchBuildHtml();
+
+          setStatus(
+            "Build found: " +
+            bytes(build.html).toLocaleString() +
+            " bytes at " +
+            build.buildUrl
+          );
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || String(error), true);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function launchBuild() {
+        try {
+          setBusy(true);
+
+          var build = await fetchBuildHtml();
+
+          redirectWithPayload(
+            makePayload(build.html, {
+              buildUrl: build.buildUrl
+            })
+          );
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || String(error), true);
+          setBusy(false);
+        }
+      }
+
+      function launchPastedHtml() {
+        try {
+          var html = manualHtml.value.trim();
+
+          if (!html) {
+            throw new Error("Paste some HTML first.");
+          }
+
+          redirectWithPayload(
+            makePayload(html, {
+              buildUrl: "manual-paste"
+            })
+          );
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || String(error), true);
+        }
+      }
+
+      async function autoLaunchIfBuildExists() {
+        if (!AUTO_LAUNCH_IF_BUILD_EXISTS) {
+          setStatus("Ready. Auto-launch is disabled.");
+          return;
+        }
+
+        try {
+          setBusy(true);
+
+          var build = await fetchBuildHtml({
+            silent: true
+          });
+
+          setStatus(
+            "Build found. Auto-launching " +
+            bytes(build.html).toLocaleString() +
+            " bytes..."
+          );
+
+          redirectWithPayload(
+            makePayload(build.html, {
+              buildUrl: build.buildUrl
+            })
+          );
+        } catch (error) {
+          console.warn(error);
+          setStatus(
+            "No /build/index.html found yet. Add one, then reload this page or click Launch build now."
+          );
+          setBusy(false);
+        }
+      }
+
+      launchBtn.addEventListener("click", launchBuild);
+      checkBtn.addEventListener("click", checkBuild);
+      launchManualBtn.addEventListener("click", launchPastedHtml);
+
+      clearNameBtn.addEventListener("click", function () {
+        window.name = "";
+        setStatus("window.name cleared.");
+      });
+
+      autoLaunchIfBuildExists();
+    })();
+  </script>
 </body>
 </html>
