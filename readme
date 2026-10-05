@@ -1,5 +1,18 @@
 # Bitmap SDK
 
+One on-chain JS SDK for:
+• Bitmap validation
+• Parcel validation + tie-breaks
+• Mondrian geometry
+• provenance + reinscriptions
+• shared IndexedDB caching
+• live block watching
+
+One import. No rebuilding the same Bitmap logic in every app.
+
+https://switch-900.github.io/bitmap-onchain-sdk/
+
+
 **On-chain JavaScript SDK for Bitmap and Parcel development on Bitcoin.**
 
 Bitmap SDK provides a single reusable API for:
