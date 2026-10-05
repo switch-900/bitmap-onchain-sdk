@@ -1,0 +1,775 @@
+# Bitmap SDK
+
+**On-chain JavaScript SDK for Bitmap and Parcel development on Bitcoin.**
+
+Bitmap SDK provides a single reusable API for:
+
+- Canonical Bitmap validation
+- Bitmap inscription and sat resolution
+- Parcel discovery and validation
+- Parcel protocol rules and tie-breaks
+- Bitmap Mondrian geometry
+- Parent/child provenance
+- Same-sat reinscription history
+- Local IndexedDB indexing
+- Bitcoin block scanning
+- New Bitmap and Parcel detection
+- Block watching and reorg handling
+
+Bitcoin and Ord recursive endpoints remain the source of truth.
+
+IndexedDB is used only as a validated local accelerator.
+
+---
+
+## Import
+
+Bitmap SDK v1 is published on a canonical sat.
+
+```js
+const {
+  default: BitmapSDK
+} = await import(
+  '/r/sat/25483050779204/at/-1/content'
+)
+```
+
+Using the sat path means applications can continue importing the same URL when a compatible SDK update is reinscribed on that sat.
+
+---
+
+## Quick start
+
+For most applications, start with:
+
+```js
+const {
+  default: BitmapSDK
+} = await import(
+  '/r/sat/25483050779204/at/-1/content'
+)
+
+const data =
+  await BitmapSDK.getBitmapData(
+    177700
+  )
+
+console.log(data.bitmap)
+console.log(data.parcels)
+console.log(data.mondrian)
+```
+
+---
+
+# Bitmap validation
+
+Validate a Bitmap:
+
+```js
+const bitmap =
+  await BitmapSDK.validateBitmap(
+    177700
+  )
+```
+
+Get its canonical inscription ID:
+
+```js
+const inscriptionId =
+  await BitmapSDK.getBitmapInscriptionId(
+    177700
+  )
+```
+
+Get the sat containing the canonical Bitmap inscription:
+
+```js
+const sat =
+  await BitmapSDK.getBitmapSat(
+    177700
+  )
+```
+
+Bitmap SDK does not simply trust an inscription because its text looks correct.
+
+Canonical Bitmap validation checks the protocol rules and resolves the correct claim.
+
+---
+
+# Parcels
+
+Validate a Parcel:
+
+```js
+const parcel =
+  await BitmapSDK.validateParcel(
+    2,
+    177700
+  )
+```
+
+Get the canonical Parcel inscription:
+
+```js
+const parcelId =
+  await BitmapSDK.getParcelInscriptionId(
+    2,
+    177700
+  )
+```
+
+Get all canonical Parcels belonging to a Bitmap:
+
+```js
+const parcels =
+  await BitmapSDK.getBitmapParcels(
+    177700
+  )
+```
+
+Get higher-level Parcel data:
+
+```js
+const parcel =
+  await BitmapSDK.getParcelData(
+    2,
+    177700
+  )
+```
+
+Validate a particular inscription as a Parcel claim:
+
+```js
+const result =
+  await BitmapSDK.validateParcelInscription(
+    'INSCRIPTION_ID'
+  )
+```
+
+Do not assume that text such as:
+
+```text
+2.177700.bitmap
+```
+
+is automatically a valid or canonical Parcel.
+
+Bitmap SDK handles the Parcel protocol rules, provenance checks, transaction bounds and canonical tie-break.
+
+---
+
+## Parcel tie-breaks
+
+When multiple valid claims compete for the same Parcel, Bitmap SDK applies the protocol tie-break:
+
+1. Earlier genesis height wins.
+2. If both claims have the same height, inscription IDs are compared using numeric-aware ordering.
+
+Applications should use the SDK result rather than implementing a separate tie-break.
+
+---
+
+# Mondrian geometry
+
+Get the deterministic Bitmap layout:
+
+```js
+const mondrian =
+  await BitmapSDK.getBitmapMondrian(
+    177700
+  )
+```
+
+Include current Parcel claims:
+
+```js
+const mondrian =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeClaims: true
+    }
+  )
+```
+
+Useful slot data includes:
+
+```js
+slot.parcelNumber
+slot.x
+slot.y
+slot.size
+slot.claimed
+slot.inscriptionId
+```
+
+The underlying Bitmap transaction-size pattern can also be requested directly:
+
+```js
+const pattern =
+  await BitmapSDK.getBitmapPattern(
+    177700
+  )
+```
+
+Bitmap SDK can derive live Mondrian data from the recursive raw block endpoint:
+
+```text
+/r/block/<height>
+```
+
+so applications do not need a non-recursive `/block/...` request.
+
+---
+
+# Provenance
+
+Build a parent/child provenance graph from an inscription:
+
+```js
+const graph =
+  await BitmapSDK.getChildrenTree(
+    inscriptionId,
+    {
+      maxDepth: 3,
+      maxNodes: 1000
+    }
+  )
+```
+
+Use:
+
+```js
+graph.nodes
+graph.edges
+```
+
+The SDK represents provenance as a graph because Ordinal inscriptions may have more than one parent.
+
+Do not assume that every inscription relationship is a simple one-parent tree.
+
+---
+
+# Bitmap tree
+
+Get a combined Bitmap view:
+
+```js
+const tree =
+  await BitmapSDK.getBitmapTree(
+    177700,
+    {
+      maxDepth: 3,
+      maxNodes: 1000,
+      includeReinscriptions: 'root'
+    }
+  )
+```
+
+Useful fields include:
+
+```js
+tree.bitmap
+tree.parcels
+tree.provenance.nodes
+tree.provenance.edges
+tree.reinscriptions
+```
+
+---
+
+# Reinscriptions
+
+Get inscriptions sharing the same sat:
+
+```js
+const chain =
+  await BitmapSDK.getReinscriptionChain(
+    inscriptionId
+  )
+```
+
+Parent/child provenance and same-sat reinscriptions are different relationships and should not be merged together.
+
+Some Ord servers may not expose the required sat index.
+
+Handle this gracefully:
+
+```js
+if (
+  chain.supported === false
+) {
+  console.log(
+    'Sat index unavailable'
+  )
+}
+```
+
+---
+
+# Shared local Bitmap storage
+
+Bitmap SDK includes a standard IndexedDB database:
+
+```text
+Database:
+bitmap-sdk
+```
+
+Current validation/storage protocol:
+
+```text
+bitmap-sdk-v1.0.1
+```
+
+The goal is to avoid every Bitmap application independently rebuilding the same local index.
+
+A compatible app can store validated:
+
+- Bitmaps
+- Parcels
+- Bitmap state
+- Mondrian layouts
+- Parcel claims
+- Child/provenance trees
+- Same-sat chains
+- Block hashes
+- Bitmap search progress
+- Watcher progress
+
+Check storage availability:
+
+```js
+await BitmapSDK.storage.ready()
+
+const status =
+  await BitmapSDK.storage.getStatus()
+
+console.log(status)
+```
+
+Read stored Bitmap information:
+
+```js
+const bitmap =
+  await BitmapSDK.storage.getBitmap(
+    177700
+  )
+```
+
+Read stored Parcels:
+
+```js
+const parcels =
+  await BitmapSDK.storage.getBitmapParcels(
+    177700
+  )
+```
+
+Subscribe to SDK storage updates:
+
+```js
+const unsubscribe =
+  BitmapSDK.storage.subscribe(
+    event => {
+      console.log(event)
+    }
+  )
+
+// Later:
+unsubscribe()
+```
+
+---
+
+## Why use the Bitmap SDK storage standard?
+
+Without a common storage layer, multiple Bitmap applications may independently:
+
+- Resolve the same Bitmap
+- Load the same children
+- Revalidate the same Parcels
+- Rebuild the same Mondrian geometry
+- Rebuild the same provenance trees
+- Recheck the same block data
+
+Bitmap SDK provides a common structure for that information.
+
+When multiple compatible applications run within the **same browser origin and storage context**, they can potentially reuse the same `bitmap-sdk` IndexedDB data instead of starting again from zero.
+
+This can make Bitmap applications progressively faster as the local index becomes populated.
+
+### Important limitation
+
+IndexedDB is browser-origin/storage-context scoped.
+
+It is **not** a global Bitcoin index and it is not automatically shared between:
+
+- Different domains
+- Different browsers
+- Different browser profiles
+- Private/incognito sessions
+- Sandboxed contexts with isolated or unavailable storage
+
+Ord preview iframes may also run under sandbox restrictions that affect storage availability or sharing.
+
+Bitmap SDK therefore treats IndexedDB as an optimisation only.
+
+If storage is unavailable, the SDK falls back to memory and live Bitcoin/Ord recursive data.
+
+---
+
+## Validation versioning
+
+Cached validation results are tagged with the SDK storage protocol version.
+
+For example:
+
+```text
+bitmap-sdk-v1.0.1
+```
+
+If validation logic changes in a later release, old validation records must not silently remain authoritative.
+
+Bitmap SDK invalidates incompatible cached validation data instead of trusting results generated under different rules.
+
+This is important because the cache must never become a second source of truth.
+
+Bitcoin and Ord remain the source of truth.
+
+---
+
+# Synchronising a Bitmap
+
+Refresh and store application-ready Bitmap data:
+
+```js
+const data =
+  await BitmapSDK.syncBitmap(
+    177700
+  )
+```
+
+This is useful when an application wants to deliberately populate or refresh its local SDK index.
+
+---
+
+# Block scanning
+
+Scan one Bitcoin block:
+
+```js
+const result =
+  await BitmapSDK.scanBlock(
+    blockHeight
+  )
+```
+
+The default scanner is deliberately designed to avoid exploding into hundreds of content requests on inscription-heavy blocks.
+
+Encoded or delegated inscriptions can be deferred during the fast scan.
+
+The result can indicate that the scan was not exhaustive:
+
+```js
+result.unresolvedEncodedOrDelegatedCount
+result.exhaustiveParcelDiscovery
+```
+
+---
+
+## Exhaustive block scan
+
+If an application genuinely needs to resolve encoded/delegated Parcel candidates immediately:
+
+```js
+const result =
+  await BitmapSDK.scanBlock(
+    blockHeight,
+    {
+      resolveEncodedParcelCandidates: true
+    }
+  )
+```
+
+This can be significantly more expensive and should not normally be required for routine block watching.
+
+Canonical Parcel APIs still perform the full validation required when a Bitmap or Parcel is requested directly.
+
+---
+
+# Latest block
+
+Scan the current Bitcoin tip:
+
+```js
+const latest =
+  await BitmapSDK.getLatestBlockUpdates()
+```
+
+---
+
+# Block watcher
+
+Watch sequential Bitcoin blocks:
+
+```js
+const watcher =
+  BitmapSDK.watchBlocks(
+    event => {
+
+      console.log(
+        event.newBitmaps
+      )
+
+      console.log(
+        event.newParcels
+      )
+
+    },
+    {
+      pollIntervalMs: 30000,
+
+      scanCurrent: true,
+
+      persist: true,
+
+      resumeFromStorage: true,
+
+      resolveEncodedParcelCandidates: false
+    }
+  )
+
+await watcher.ready
+```
+
+Stop it later:
+
+```js
+watcher.stop()
+```
+
+The watcher can persist its progress in IndexedDB so a compatible application can continue rather than unnecessarily beginning again.
+
+---
+
+# Fast watcher vs exhaustive discovery
+
+The default:
+
+```js
+resolveEncodedParcelCandidates: false
+```
+
+is intended for efficient continuous watching.
+
+This prevents a single inscription-heavy Bitcoin block from triggering hundreds of content requests.
+
+Use:
+
+```js
+resolveEncodedParcelCandidates: true
+```
+
+only when exhaustive encoded/delegated Parcel discovery during the block scan is specifically required.
+
+---
+
+# Reorg handling
+
+The block watcher stores recent block hashes and can detect when a previously processed height no longer matches the current chain.
+
+On a detected reorganisation, SDK state can be rewound and rescanned from an earlier safe height.
+
+---
+
+# Main API
+
+## Bitmap
+
+```text
+validateBitmap()
+getBitmapData()
+getBitmapInscriptionId()
+getBitmapSat()
+syncBitmap()
+```
+
+## Parcel
+
+```text
+getBitmapParcels()
+validateParcel()
+validateParcelInscription()
+getParcelInscriptionId()
+getParcelData()
+```
+
+## Geometry
+
+```text
+getBitmapPattern()
+getBitmapMondrian()
+```
+
+## Structure
+
+```text
+getChildrenTree()
+getBitmapTree()
+getReinscriptionChain()
+```
+
+## Bitcoin chain
+
+```text
+getChainHeight()
+getBlockHash()
+getBlockHashWithRetry()
+scanBlock()
+getLatestBlockUpdates()
+watchBlocks()
+```
+
+## Storage
+
+```text
+storage.ready()
+storage.available()
+storage.getBitmap()
+storage.getParcel()
+storage.getBitmapParcels()
+storage.getBitmapState()
+storage.getMondrian()
+storage.getChildrenTree()
+storage.getSatChain()
+storage.getStatus()
+storage.subscribe()
+storage.clear()
+storage.close()
+```
+
+## Utilities
+
+```text
+parseBitmapName()
+parseParcelName()
+compareParcelClaims()
+clearParcelCache()
+clearCaches()
+```
+
+---
+
+# On-chain dependencies
+
+Bitmap SDK builds recursively on existing on-chain primitives.
+
+### Legacy Bitmap OCI
+
+Used for historical Bitmaps below the SDK's live-scan threshold:
+
+```text
+942b5886158d57fc70cb8fb7d9bd4d37aa95b8b145be1a351326336b087262dbi0
+```
+
+### Bitcoin block / inscription parser
+
+```text
+bbbb2172ebca174579884df1ad7487196c39e860b3aacdf4e052a33bf5ec31fai0
+```
+
+### Mondrian primitive
+
+```text
+55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0
+```
+
+---
+
+# Design principles
+
+Bitmap SDK is designed around a few rules:
+
+1. **Bitcoin is the source of truth.**
+2. **Ord recursive endpoints are preferred for on-chain applications.**
+3. **Do not trust a claim only because its text looks correct.**
+4. **Canonical Bitmap and Parcel rules belong in one reusable SDK.**
+5. **IndexedDB is an accelerator, never the authority.**
+6. **Cached validation must be versioned.**
+7. **Applications should reuse validated local data when their storage context allows it.**
+8. **Block watching should not generate unnecessary network amplification.**
+9. **Parent/child relationships and same-sat reinscriptions are separate concepts.**
+10. **The SDK should remain usable directly from an on-chain HTML/JavaScript application.**
+
+---
+
+# AI coding sheet
+
+If you use an AI coding assistant, give it this instruction:
+
+```text
+I am building a Bitmap application.
+
+Use Bitmap SDK as the canonical Bitmap and Parcel data layer.
+
+Import it with:
+
+const {
+  default: BitmapSDK
+} = await import(
+  '/r/sat/25483050779204/at/-1/content'
+)
+
+Do not recreate Bitmap validation, Parcel validation,
+Parcel tie-breaks, Mondrian geometry or provenance logic
+inside the application.
+
+For most Bitmap applications begin with:
+
+const data =
+  await BitmapSDK.getBitmapData(bitmapNumber)
+
+Use validateBitmap() and validateParcel() when canonicality matters.
+
+Use getBitmapMondrian() for Bitmap geometry.
+
+Treat parent/child provenance and same-sat reinscriptions
+as separate relationships.
+
+Bitmap SDK's IndexedDB storage is optional and must never
+be treated as the source of truth.
+
+Prefer Ord recursive endpoints and keep the application
+suitable for an on-chain JavaScript inscription.
+```
+
+---
+
+# Version
+
+```text
+Bitmap SDK v1.0.1
+```
+
+Canonical SDK sat:
+
+```text
+25483050779204
+```
+
+Import:
+
+```text
+/r/sat/25483050779204/at/-1/content
+```
+
+---
+
+## Status
+
+Bitmap SDK is experimental software.
+
+Applications handling important assets or transactions should independently verify critical protocol results.
+
+Contributions, independent testing and protocol review are encouraged.
