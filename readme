@@ -107,6 +107,37 @@ Bitmap SDK does not simply trust an inscription because its text looks correct.
 
 Canonical Bitmap validation checks the protocol rules and resolves the correct claim.
 
+For interactive maps that cannot afford an unbounded post-OCI scan in one user action,
+use the bounded resumable scanner:
+
+```js
+const scan =
+  await BitmapSDK.scanBitmapClaim(
+    950000,
+    {
+      maxScanBlocks: 64
+    }
+  )
+
+if (scan.state === 'found') {
+  console.log(scan.inscriptionId)
+}
+
+if (
+  scan.state === 'missing'
+  && scan.complete === false
+) {
+  console.log(
+    'Scanned through',
+    scan.scannedThroughHeight,
+    'resume later from SDK storage'
+  )
+}
+```
+
+The SDK controls the resume point from validated stored scan progress. A caller
+cannot skip unscanned heights and then treat a later claim as canonical.
+
 ---
 
 # Parcels
@@ -203,6 +234,7 @@ const mondrian =
       includeClaims: true
     }
   )
+```
 
 Request exact transaction output totals only when an application needs them:
 
@@ -223,7 +255,6 @@ console.log(
 `includeValues` intentionally uses the recursive raw block path because
 the compact pattern index stores size classes rather than exact transaction
 values. Exact values are not persisted into the shared Mondrian cache.
-```
 
 Useful slot data includes:
 
@@ -232,6 +263,7 @@ slot.parcelNumber
 slot.x
 slot.y
 slot.size
+slot.valueSats
 slot.claimed
 slot.inscriptionId
 ```
@@ -243,6 +275,7 @@ const pattern =
   await BitmapSDK.getBitmapPattern(
     177700
   )
+```
 
 Inspect how the pattern was resolved:
 
@@ -260,7 +293,6 @@ console.log(patternInfo.cached)
 `indexed === true` means the pattern came from the canonical on-chain
 Mondrian/Bitmon pattern index. `cached` only describes whether IndexedDB
 accelerated the lookup; it does not change the underlying provenance.
-```
 
 Bitmap SDK can derive live Mondrian data from the recursive raw block endpoint:
 
