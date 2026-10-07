@@ -369,7 +369,7 @@ bitmap-sdk
 Current validation/storage protocol:
 
 ```text
-bitmap-sdk-v1.0.2
+bitmap-sdk-v1.0.1
 ```
 
 The goal is to avoid every Bitmap application independently rebuilding the same local index.
@@ -476,7 +476,7 @@ Cached validation results are tagged with the SDK storage protocol version.
 For example:
 
 ```text
-bitmap-sdk-v1.0.2
+bitmap-sdk-v1.0.1
 ```
 
 If validation logic changes in a later release, old validation records must not silently remain authoritative.
