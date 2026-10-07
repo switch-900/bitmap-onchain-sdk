@@ -151,6 +151,25 @@ for (const slot of mondrian.slots) {
   await BitmapSDK.getBitmapPattern(
     177700
   )</pre>
+<p>Inspect whether that pattern came from the canonical on-chain pattern index:</p>
+<pre class="code">const patternInfo =
+  await BitmapSDK.getBitmapPatternInfo(
+    177700
+  )
+
+console.log(patternInfo.source)
+console.log(patternInfo.indexed)
+console.log(patternInfo.cached)</pre>
+<p>Request exact transaction output totals only when they are needed. This deliberately uses the recursive raw block path because the compact pattern index stores size classes, not exact values.</p>
+<pre class="code">const exact =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeValues: true
+    }
+  )
+
+console.log(exact.slots[0].valueSats)</pre>
 </section>
 <section id="tree">
 <h2>Children and provenance</h2>
@@ -294,7 +313,8 @@ watcher.stop()</pre>
 <tr><td>Parcel</td><td><code>getParcelInscriptionId()</code></td><td>Return the canonical Parcel inscription ID.</td></tr>
 <tr><td>Parcel</td><td><code>getParcelData()</code></td><td>Return high-level Parcel data.</td></tr>
 <tr><td>Geometry</td><td><code>getBitmapPattern()</code></td><td>Return the deterministic transaction-size pattern.</td></tr>
-<tr><td>Geometry</td><td><code>getBitmapMondrian()</code></td><td>Return deterministic Parcel coordinates and sizes.</td></tr>
+<tr><td>Geometry</td><td><code>getBitmapPatternInfo()</code></td><td>Return pattern provenance, including whether it came from the canonical on-chain pattern index.</td></tr>
+<tr><td>Geometry</td><td><code>getBitmapMondrian()</code></td><td>Return deterministic Parcel coordinates and sizes; use <code>includeValues:true</code> only when exact transaction totals are required.</td></tr>
 <tr><td>Structure</td><td><code>getChildrenTree()</code></td><td>Build a parent / child provenance graph.</td></tr>
 <tr><td>Structure</td><td><code>getBitmapTree()</code></td><td>Combine Bitmap provenance, Parcels and reinscriptions.</td></tr>
 <tr><td>Structure</td><td><code>getReinscriptionChain()</code></td><td>Return ordered same-sat inscription history.</td></tr>
@@ -546,6 +566,28 @@ const pattern =
   await BitmapSDK.getBitmapPattern(
     177700
   )
+
+const patternInfo =
+  await BitmapSDK.getBitmapPatternInfo(
+    177700
+  )
+
+patternInfo.indexed === true means the pattern came from
+the canonical on-chain pattern index.
+
+When exact transaction output totals are required:
+
+const exactMondrian =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeValues: true
+    }
+  )
+
+slot.valueSats is then the exact transaction output total.
+Do not request includeValues for broad map rendering unless needed,
+because it deliberately uses the recursive raw block path.
 
 Use Bitmap SDK geometry rather than inventing another Bitmap layout.
 
