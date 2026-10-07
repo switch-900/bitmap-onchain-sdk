@@ -53,7 +53,7 @@ Using the sat path means applications can continue importing the same URL when a
 
 ## Quick start
 
-For most applications, start with:
+For a known Bitmap, or when a complete canonical sync is acceptable, start with:
 
 ```js
 const {
@@ -71,6 +71,11 @@ console.log(data.bitmap)
 console.log(data.parcels)
 console.log(data.mondrian)
 ```
+
+For interactive discovery of a post-OCI or otherwise unknown Bitmap, call
+`scanBitmapClaim()` first. `getBitmapData()` performs a complete sync when
+its stored state is absent or stale, so it is intentionally not a bounded UI
+operation.
 
 ---
 
