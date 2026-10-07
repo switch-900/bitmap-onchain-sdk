@@ -92,11 +92,12 @@ const sat =
   await BitmapSDK.getBitmapSat(
     177700
   )</pre>
-<p>For application-ready data:</p>
+<p>For a known Bitmap, or when a complete canonical sync is acceptable:</p>
 <pre class="code">const data =
   await BitmapSDK.getBitmapData(
     177700
   )</pre>
+<p><code>getBitmapData()</code> is a complete-sync API when stored state is absent or stale. Interactive discovery should use <code>scanBitmapClaim()</code> first.</p>
 <p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p><p>For interactive maps, use bounded resumable discovery instead of blocking on an unbounded post-OCI scan:</p>
 <pre class="code">const scan =
   await BitmapSDK.scanBitmapClaim(
@@ -113,7 +114,7 @@ if (scan.state === 'found') {
 if (scan.state === 'missing' && !scan.complete) {
   console.log(scan.scannedThroughHeight)
 }</pre>
-<p>The SDK owns the resume point from persisted scan progress, so callers cannot skip unscanned heights and later treat a hit as canonical.</p>
+<p>The SDK owns the resume point from trusted scan progress. Progress remains available in memory when IndexedDB is unavailable, is persisted when storage is available, and is checkpointed against the scanned block hash so a reorg cannot silently advance a stale cursor.</p>
 </section>
 <section id="parcel">
 <h2>Parcel validation</h2>
@@ -426,6 +427,10 @@ async function loadSDK(force=false){
     const imported=await import(BITMAP_SDK_SOURCE)
     const candidate=imported.default||imported
     const required=['validateBitmap','validateParcel','getBitmapData','getBitmapMondrian','getBitmapTree','watchBlocks']
+    const version=String(candidate?.VERSION||'')
+    if(/^1\.(?:[1-9]\d*|0\.(?:[2-9]|\d{2,}))/.test(version)){
+      required.push('scanBitmapClaim','getBitmapPatternInfo')
+    }
     for(const name of required){
       if(typeof candidate?.[name] !== 'function') throw new Error(`Loaded SDK is missing ${name}()`)
     }
@@ -478,7 +483,8 @@ ${BITMAP_SDK_V1_SAT}
 
 BEST STARTING POINT
 
-For most Bitmap applications begin with:
+For a known Bitmap, or when a complete canonical sync is
+acceptable:
 
 const data =
   await BitmapSDK.getBitmapData(
@@ -491,6 +497,10 @@ data.bitmap
 data.parcels
 data.state
 data.mondrian
+
+getBitmapData() is a complete-sync API when stored state is
+absent or stale. For interactive discovery of an unknown or
+post-OCI Bitmap, use scanBitmapClaim() first.
 
 BITMAPS
 
@@ -524,8 +534,10 @@ const scan =
 
 scan.complete === false means the SDK has safely scanned only
 part of the required range. Do not reinterpret that as
-"No Bitmap exists". Resume later; the SDK persists trusted
-scan progress.
+"No Bitmap exists". Resume later; the SDK keeps trusted
+progress in memory and also persists it when IndexedDB is
+available. Saved progress is checked against the block hash
+before it is trusted after a later call.
 
 PARCELS
 

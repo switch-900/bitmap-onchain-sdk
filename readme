@@ -53,7 +53,7 @@ Using the sat path means applications can continue importing the same URL when a
 
 ## Quick start
 
-For most applications, start with:
+For a known Bitmap, or when a complete canonical sync is acceptable, start with:
 
 ```js
 const {
@@ -71,6 +71,11 @@ console.log(data.bitmap)
 console.log(data.parcels)
 console.log(data.mondrian)
 ```
+
+For interactive discovery of a post-OCI or otherwise unknown Bitmap, call
+`scanBitmapClaim()` first. `getBitmapData()` performs a complete sync when
+its stored state is absent or stale, so it is intentionally not a bounded UI
+operation.
 
 ---
 
@@ -130,13 +135,16 @@ if (
   console.log(
     'Scanned through',
     scan.scannedThroughHeight,
-    'resume later from SDK storage'
+    'resume later from SDK progress'
   )
 }
 ```
 
-The SDK controls the resume point from validated stored scan progress. A caller
-cannot skip unscanned heights and then treat a later claim as canonical.
+The SDK controls the resume point from trusted scan progress. It keeps progress
+in memory even when IndexedDB is unavailable, and persists it when storage is
+available. Each saved checkpoint is tied to its block hash; if that hash changes,
+the SDK discards the cursor and restarts from the Bitmap height. A caller cannot
+skip unscanned heights and then treat a later claim as canonical.
 
 ---
 
