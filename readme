@@ -203,6 +203,26 @@ const mondrian =
       includeClaims: true
     }
   )
+
+Request exact transaction output totals only when an application needs them:
+
+```js
+const mondrianWithValues =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeValues: true
+    }
+  )
+
+console.log(
+  mondrianWithValues.slots[0].valueSats
+)
+```
+
+`includeValues` intentionally uses the recursive raw block path because
+the compact pattern index stores size classes rather than exact transaction
+values. Exact values are not persisted into the shared Mondrian cache.
 ```
 
 Useful slot data includes:
@@ -223,6 +243,23 @@ const pattern =
   await BitmapSDK.getBitmapPattern(
     177700
   )
+
+Inspect how the pattern was resolved:
+
+```js
+const patternInfo =
+  await BitmapSDK.getBitmapPatternInfo(
+    177700
+  )
+
+console.log(patternInfo.source)
+console.log(patternInfo.indexed)
+console.log(patternInfo.cached)
+```
+
+`indexed === true` means the pattern came from the canonical on-chain
+Mondrian/Bitmon pattern index. `cached` only describes whether IndexedDB
+accelerated the lookup; it does not change the underlying provenance.
 ```
 
 Bitmap SDK can derive live Mondrian data from the recursive raw block endpoint:
@@ -332,7 +369,7 @@ bitmap-sdk
 Current validation/storage protocol:
 
 ```text
-bitmap-sdk-v1.0.1
+bitmap-sdk-v1.0.2
 ```
 
 The goal is to avoid every Bitmap application independently rebuilding the same local index.
@@ -439,7 +476,7 @@ Cached validation results are tagged with the SDK storage protocol version.
 For example:
 
 ```text
-bitmap-sdk-v1.0.1
+bitmap-sdk-v1.0.2
 ```
 
 If validation logic changes in a later release, old validation records must not silently remain authoritative.
@@ -622,6 +659,7 @@ getParcelData()
 
 ```text
 getBitmapPattern()
+getBitmapPatternInfo()
 getBitmapMondrian()
 ```
 
