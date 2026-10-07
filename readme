@@ -671,6 +671,7 @@ On a detected reorganisation, SDK state can be rewound and rescanned from an ear
 
 ```text
 validateBitmap()
+scanBitmapClaim()
 getBitmapData()
 getBitmapInscriptionId()
 getBitmapSat()
