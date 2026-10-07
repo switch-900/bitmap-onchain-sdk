@@ -455,31 +455,31 @@ async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = nu
     (t === r || (t - i + 1) % 250 == 0) && await persistBitmapSearch(e, t);
 } return null; }; if (t)
     return await r(); const n = r().finally(() => bitmapPromiseCache.delete(e)); return bitmapPromiseCache.set(e, n), await n; }
-export async function scanBitmapClaim(e, { maxScanBlocks: t = 64, startHeight: a = null, forceRefresh: r = !1, persist: n = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
-    throw new TypeError("maxScanBlocks must be 1..10000"); const i = await getChainHeightCached(); if (e > i)
-    return { state: "future", bitmapNumber: e, tipHeight: i, complete: !0 }; if (!r) {
+export async function scanBitmapClaim(e, { maxScanBlocks: t = 64, forceRefresh: a = !1, persist: r = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
+    throw new TypeError("maxScanBlocks must be 1..10000"); const n = await getChainHeightCached(); if (e > n)
+    return { state: "future", bitmapNumber: e, tipHeight: n, complete: !0 }; if (!a) {
     const t = await storageGetBitmapSafe(e);
     if (!0 === t?.validated)
-        return { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: t.height, ...storedBitmapToValidation(t) };
+        return { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: t.height, ...storedBitmapToValidation(t) };
 } if (e < OLD_OCI_LIMIT) {
     let t = null;
     try {
         t = await indexInscriptionId(e);
     }
-    catch { } const a = await verifyBitmapCandidate(e, t, { forceRefresh: r });
-    if (a) {
-        const t = a.info || await getInscriptionInfo(a.id, { forceRefresh: r }), o = normaliseHeight(t), s = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: a.id, sat: t?.sat ?? null, height: o, number: t?.number ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, source: "legacy-oci" };
-        return n && (await persistBitmapRecord(s, i), await persistBitmapSearch(e, o, a.id, o)), { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: o, ...s };
+    catch { } const i = await verifyBitmapCandidate(e, t, { forceRefresh: a });
+    if (i) {
+        const t = i.info || await getInscriptionInfo(i.id, { forceRefresh: a }), o = normaliseHeight(t), s = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: i.id, sat: t?.sat ?? null, height: o, number: t?.number ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, source: "legacy-oci" };
+        return r && (await persistBitmapRecord(s, n), await persistBitmapSearch(e, o, i.id, o)), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: o, ...s };
     }
-} const o = r ? null : await storageGetBitmapSearchSafe(e); let c = Number.isSafeInteger(a) ? Math.max(e, a) : e; !r && !Number.isSafeInteger(a) && o && Number.isSafeInteger(o.scannedThroughHeight) && (c = Math.max(c, o.scannedThroughHeight + 1)); if (c > i)
-    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: i, scannedThroughHeight: i }; const l = Math.min(i, c + t - 1); for (let t = c; t <= l; t++) {
+} const i = a ? null : await storageGetBitmapSearchSafe(e); let o = e; !a && i && Number.isSafeInteger(i.scannedThroughHeight) && (o = Math.max(o, i.scannedThroughHeight + 1)); if (o > n)
+    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: n, scannedThroughHeight: n, nextHeight: null }; const c = Math.min(n, o + t - 1); for (let t = o; t <= c; t++) {
     const a = await getParsedBlockInscriptionsWithRetry(t);
-    for (const r of a)
-        if (isValidBitmapParsedInscription(r, e)) {
-            const a = await getInscriptionInfo(r.id, { forceRefresh: !1 }), o = normaliseHeight(a), c = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: r.id, sat: a?.sat ?? null, height: o, number: a?.number ?? null, address: a?.address ?? null, output: a?.output ?? null, satpoint: a?.satpoint ?? null, timestamp: a?.timestamp ?? null, source: "bounded-live-block-scan" };
-            return foundBitmapCache.set(e, r), n && (await persistBitmapSearch(e, t, r.id, t), await persistBitmapRecord(c, i)), { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: t, ...c };
+    for (const i of a)
+        if (isValidBitmapParsedInscription(i, e)) {
+            const a = await getInscriptionInfo(i.id, { forceRefresh: !1 }), o = normaliseHeight(a), c = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: i.id, sat: a?.sat ?? null, height: o, number: a?.number ?? null, address: a?.address ?? null, output: a?.output ?? null, satpoint: a?.satpoint ?? null, timestamp: a?.timestamp ?? null, source: "bounded-live-block-scan" };
+            return foundBitmapCache.set(e, i), r && (await persistBitmapSearch(e, t, i.id, t), await persistBitmapRecord(c, n)), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: t, ...c };
         }
-} return n && await persistBitmapSearch(e, l), { state: "missing", bitmapNumber: e, complete: l >= i, tipHeight: i, scannedThroughHeight: l, nextHeight: l < i ? l + 1 : null }; }
+} return r && await persistBitmapSearch(e, c), { state: "missing", bitmapNumber: e, complete: c >= n, tipHeight: n, scannedThroughHeight: c, nextHeight: c < n ? c + 1 : null }; }
 export async function getBitmapInscriptionId(e, { forceRefresh: t = !1 } = {}) { if (checkBitmapNumber(e), !t) {
     const t = await storageGetBitmapSafe(e);
     if (!0 === t?.validated && "string" == typeof t.inscriptionId)
