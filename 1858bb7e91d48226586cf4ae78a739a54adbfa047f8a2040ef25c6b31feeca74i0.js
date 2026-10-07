@@ -42,7 +42,7 @@ export const MONDRIAN_MODULE_ID = "55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff
 export const STORAGE_DB_NAME = "bitmap-sdk";
 export const STORAGE_DB_VERSION = 2;
 export const STORAGE_PROTOCOL_VERSION = "bitmap-sdk-v1.0.1";
-const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapSearchCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
+const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapScanPromiseCache = new Map, bitmapSearchCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
 let mondrianModulePromise = null, tipCache = { height: null, expiresAt: 0 };
 function getTtl(e, t) { const a = e.get(t); if (a) {
     if (!(Date.now() >= a.expiresAt))
@@ -466,7 +466,7 @@ async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = nu
     (t === r || (t - i + 1) % 250 == 0) && await persistBitmapSearch(e, t);
 } return null; }; if (t)
     return await r(); const n = r().finally(() => bitmapPromiseCache.delete(e)); return bitmapPromiseCache.set(e, n), await n; }
-export async function scanBitmapClaim(e, { maxScanBlocks: t = 64, forceRefresh: a = !1, persist: r = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
+async function scanBitmapClaimInternal(e, { maxScanBlocks: t = 64, forceRefresh: a = !1, persist: r = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
     throw new TypeError("maxScanBlocks must be 1..10000"); const n = await getChainHeightCached(); if (e > n)
     return { state: "future", bitmapNumber: e, tipHeight: n, complete: !0 }; if (!a) {
     const t = await storageGetBitmapSafe(e);
@@ -491,6 +491,9 @@ export async function scanBitmapClaim(e, { maxScanBlocks: t = 64, forceRefresh: 
             return foundBitmapCache.set(e, i), await persistBitmapSearch(e, t, i.id, t, r), r && await persistBitmapRecord(c, n), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: t, ...c };
         }
 } return await persistBitmapSearch(e, c, null, null, r), { state: "missing", bitmapNumber: e, complete: c >= n, tipHeight: n, scannedThroughHeight: c, nextHeight: c < n ? c + 1 : null }; }
+export async function scanBitmapClaim(e, t = {}) { checkBitmapNumber(e); if (!0 !== t?.forceRefresh && bitmapScanPromiseCache.has(e))
+    return await bitmapScanPromiseCache.get(e); const a = scanBitmapClaimInternal(e, t); if (!0 === t?.forceRefresh)
+    return await a; const r = Promise.resolve(a).finally(() => bitmapScanPromiseCache.delete(e)); return bitmapScanPromiseCache.set(e, r), await r; }
 export async function getBitmapInscriptionId(e, { forceRefresh: t = !1 } = {}) { if (checkBitmapNumber(e), !t) {
     const t = await storageGetBitmapSafe(e);
     if (!0 === t?.validated && "string" == typeof t.inscriptionId)
@@ -991,7 +994,7 @@ catch (e) {
 catch (e) {
     y.lastError = e?.message || String(e), await I({ type: "error", error: e, message: y.lastError, lastProcessedHeight: f });
 } return y; }().finally(() => { b = null; }), b); } function C() { m || (h = setTimeout(async () => { await S(), C(); }, t)); } function N() { m || (m = !0, y.running = !1, null !== h && (clearTimeout(h), h = null), s && v && s.removeEventListener("abort", v)); } const v = () => N(); s && (s.aborted ? N() : s.addEventListener("abort", v, { once: !0 })); const P = S().finally(() => { m || C(); }); return Object.freeze({ stop: N, checkNow: S, ready: P, state: y }); }
-export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapSearchCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
+export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapScanPromiseCache.clear(), bitmapSearchCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
 export function clearParcelCache(e) { if (void 0 === e)
     return childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), void parcelStateCache.clear(); checkBitmapNumber(e), parcelStateCache.delete(e); }
 export const storage = Object.freeze({ ready: async () => await initialiseStorage(), available: () => indexedDbAvailable(), getBitmap: async (e) => (checkBitmapNumber(e), await storageGetBitmapSafe(e)), getParcel: async (e, t) => (checkParcelNumber(e), checkBitmapNumber(t), await storageGetParcelSafe(e, t)), getBitmapParcels: async (e) => (checkBitmapNumber(e), await storageGetBitmapParcelsSafe(e)), getBitmapState: async (e) => (checkBitmapNumber(e), await storageGetBitmapStateSafe(e)), getMondrian: async (e) => (checkBitmapNumber(e), await storageGetMondrianSafe(e)), async clear() { if (!indexedDbAvailable())
