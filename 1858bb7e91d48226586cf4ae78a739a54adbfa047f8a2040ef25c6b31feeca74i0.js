@@ -36,7 +36,7 @@
 import { getBitmapSat as indexSat, getBitmapInscriptionId as indexInscriptionId } from "/content/942b5886158d57fc70cb8fb7d9bd4d37aa95b8b145be1a351326336b087262dbi0";
 import { fetchBlock, listInscriptions, toHex } from "/content/bbbb2172ebca174579884df1ad7487196c39e860b3aacdf4e052a33bf5ec31fai0";
 export const SDK_NAME = "Bitmap SDK";
-export const VERSION = "1.0.1";
+export const VERSION = "1.0.2";
 export const OLD_OCI_LIMIT = 942e3;
 export const MONDRIAN_MODULE_ID = "55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0";
 export const STORAGE_DB_NAME = "bitmap-sdk";
@@ -362,7 +362,7 @@ catch {
 async function persistBitmapSearch(e, t, a = null, r = null) { return indexedDbAvailable() ? (await initialiseStorage(), await idbPut("bitmapSearch", { bitmapNumber: e, scannedThroughHeight: t, foundInscriptionId: a, foundHeight: r, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() })) : !1; }
 function storedBitmapToValidation(e) { return { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e.bitmapNumber, name: e.name, inscriptionId: e.inscriptionId, sat: e.sat ?? null, height: e.height, number: e.number ?? null, address: e.address ?? null, output: e.output ?? null, satpoint: e.satpoint ?? null, timestamp: e.timestamp ?? null, source: "indexeddb", validatedThroughHeight: e.validatedThroughHeight ?? null }; }
 function storedParcelToValidation(e) { return { id: e.id, content: e.content, name: e.name, parcelNumber: e.parcelNumber, bitmapNumber: e.bitmapNumber, bitmapInscriptionId: e.bitmapInscriptionId, height: e.height, number: e.number ?? null, fee: e.fee ?? null, output: e.output ?? null, sat: e.sat ?? null, satpoint: e.satpoint ?? null, timestamp: e.timestamp ?? null, charms: Array.isArray(e.charms) ? [...e.charms] : [], validatedThroughHeight: e.validatedThroughHeight ?? null }; }
-function storedMondrianToPublic(e) { return { bitmapNumber: e.bitmapNumber, source: "indexeddb", transactionCount: e.transactionCount, pattern: Array.isArray(e.pattern) ? e.pattern.slice() : [], width: e.width, height: e.height, length: e.length ?? null, slots: Array.isArray(e.slots) ? e.slots.map(e => ({ ...e })) : [], ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {} }; }
+function storedMondrianToPublic(e) { const t = e.patternSource ?? e.source ?? null; return { bitmapNumber: e.bitmapNumber, source: "indexeddb", patternSource: t, indexed: "on-chain-pattern-index" === t, transactionCount: e.transactionCount, pattern: Array.isArray(e.pattern) ? e.pattern.slice() : [], width: e.width, height: e.height, length: e.length ?? null, slots: Array.isArray(e.slots) ? e.slots.map(e => ({ ...e })) : [], ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {} }; }
 function parcelStateFromStored(e, t, a, r) { const n = r.map(storedParcelToValidation); return { valid: !0, bitmapNumber: e, bitmap: t, transactionCount: a.transactionCount, totalChildren: a.totalChildren ?? null, validParcelCount: n.length, unclaimedParcelCount: Math.max(0, a.transactionCount - n.length), validParcels: n, invalidChildren: Array.isArray(a.invalidChildren) ? a.invalidChildren : [], duplicateClaims: Array.isArray(a.duplicateClaims) ? a.duplicateClaims : [], stored: !0, childrenScannedThroughHeight: a.childrenScannedThroughHeight ?? null }; }
 async function safeCurrentTip(e = 0) { try {
     return Math.max(e, await getChainHeightCached());
@@ -715,7 +715,7 @@ async function fetchLiveMondrianPattern(e, t) { if ("function" != typeof t?.getS
     throw new Error("Mondrian module does not export getSquareSize()"); const a = await fetchRecursiveBlockOutputTotals(e), r = await getBlockTransactionCount(e); if (a.length !== r)
     throw new Error("Mondrian transaction count mismatch for block " + e + ": raw-block=" + a.length + ", blockinfo=" + r); const n = validateMondrianPattern(a.map(e => t.getSquareSize(e)), e); return { pattern: n, source: "recursive-raw-block" }; }
 async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a = !0 } = {}) { checkBitmapNumber(e); const r = await storageGetMondrianSafe(e); if (!t && Array.isArray(r?.pattern) && r.pattern.length > 0)
-    return { pattern: validateMondrianPattern(r.pattern, e), source: "indexeddb", mondrianModule: await loadMondrianModule() }; const n = await loadMondrianModule(); if (!t && "function" == typeof n?.getPatternArray) {
+    return { pattern: validateMondrianPattern(r.pattern, e), source: r.patternSource ?? r.source ?? "indexeddb", cacheSource: "indexeddb", mondrianModule: await loadMondrianModule() }; const n = await loadMondrianModule(); if (!t && "function" == typeof n?.getPatternArray) {
     const t = validateMondrianPattern(n.getPatternArray(e), e);
     if (t) {
         const a = await getBlockTransactionCount(e);
@@ -726,19 +726,24 @@ async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a
 } if (!a)
     throw new Error("No indexed Mondrian pattern is available for block " + e); return { ...await fetchLiveMondrianPattern(e, n), mondrianModule: n }; }
 export async function getBitmapPattern(e, t = {}) { return (await resolveBitmapPattern(e, t)).pattern.slice(); }
-export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r) {
+export async function getBitmapPatternInfo(e, t = {}) { const { pattern: a, source: r, cacheSource: n = null } = await resolveBitmapPattern(e, t); return { bitmapNumber: e, pattern: a.slice(), source: r, indexed: "on-chain-pattern-index" === r, cached: "indexeddb" === n }; }
+export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v) {
     const t = await storageGetMondrianSafe(e);
     if (t?.slots)
         return storedMondrianToPublic(t);
     if (mondrianCache.has(s))
         return mondrianCache.get(s);
-} const { pattern: c, source: l, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
-    throw new Error("Mondrian module does not export MondrianLayout"); const d = new u.MondrianLayout(c), p = "function" == typeof d.getSize ? d.getSize() : { width: d.width, height: d.height }; if (!Number.isFinite(p?.width) || !Number.isFinite(p?.height) || !Array.isArray(d?.slots))
+} const { pattern: c, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
+    throw new Error("Mondrian module does not export MondrianLayout"); let w = null; if (v) {
+    w = await fetchRecursiveBlockOutputTotals(e);
+    if (w.length !== c.length)
+        throw new Error("Mondrian transaction value count mismatch for block " + e + ": values=" + w.length + ", pattern=" + c.length);
+} const d = new u.MondrianLayout(c), p = "function" == typeof d.getSize ? d.getSize() : { width: d.width, height: d.height }; if (!Number.isFinite(p?.width) || !Number.isFinite(p?.height) || !Array.isArray(d?.slots))
     throw new Error("Mondrian module returned an invalid layout"); let m = null, h = null; if (a && (h = await validateBitmap(e, { forceRefresh: !1, persist: o }), m = new Map, h.valid)) {
     const t = await getBitmapParcels(e, { forceRefresh: r, requireCurrent: !0, persist: o });
     for (const e of t.validParcels || [])
         m.set(e.parcelNumber, e);
-} const b = d.slots.map((t, r) => { const n = m?.get(r) || null; return { parcelNumber: r, name: r + "." + e + ".bitmap", x: t.position.x, y: t.position.y, size: t.size, ...a ? { claimed: Boolean(n), inscriptionId: n?.id ?? null } : {} }; }), g = t ? d.fillEmptySpaces(!0).map(e => ({ x: e.position.x, y: e.position.y, size: e.size })) : void 0, f = { bitmapNumber: e, source: l, transactionCount: c.length, pattern: c.slice(), width: p.width, height: p.height, length: Number.isFinite(d.length) ? d.length : null, slots: b, ...t ? { emptySpaces: g } : {}, ...a ? { bitmapClaimed: Boolean(h?.valid), bitmapInscriptionId: h?.inscriptionId ?? null } : {} }; return o && !a && await persistMondrian(f), a || mondrianCache.set(s, f), f; }
+} const b = d.slots.map((t, r) => { const n = m?.get(r) || null; return { parcelNumber: r, name: r + "." + e + ".bitmap", x: t.position.x, y: t.position.y, size: t.size, ...v ? { valueSats: w?.[r] ?? null } : {}, ...a ? { claimed: Boolean(n), inscriptionId: n?.id ?? null } : {} }; }), g = t ? d.fillEmptySpaces(!0).map(e => ({ x: e.position.x, y: e.position.y, size: e.size })) : void 0, f = { bitmapNumber: e, source: l, patternSource: l, indexed: "on-chain-pattern-index" === l, cacheSource: q, transactionCount: c.length, pattern: c.slice(), width: p.width, height: p.height, length: Number.isFinite(d.length) ? d.length : null, slots: b, ...t ? { emptySpaces: g } : {}, ...a ? { bitmapClaimed: Boolean(h?.valid), bitmapInscriptionId: h?.inscriptionId ?? null } : {} }; return o && !a && !v && await persistMondrian(f), a || mondrianCache.set(s, f), f; }
 function treeNodeFromInfo(e, t, a = null) { return { id: e, depth: a, height: normaliseHeight(t), number: t?.number ?? null, sat: t?.sat ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, charms: Array.isArray(t?.charms) ? [...t.charms] : [] }; }
 function buildNestedTree(e, t, a) { const r = new Map(t.map(e => [e.id, e])), n = new Map, i = new Map; for (const e of a)
     "parent-child" === e.type && (n.has(e.from) || n.set(e.from, []), n.get(e.from).push(e.to), i.set(e.to, (i.get(e.to) || 0) + 1)); const o = new Set; return function t(a, s = new Set) { const c = r.get(a) || { id: a }; if (s.has(a))
@@ -965,5 +970,5 @@ export const storage = Object.freeze({ ready: async () => await initialiseStorag
         catch { }
         storageChannel = null;
     } storageDbPromise && storageDbPromise.then(e => e?.close()).catch(() => { }), storageDbPromise = null, storageInitialisedPromise = null; } });
-const BitmapSDK = Object.freeze({ SDK_NAME, VERSION: "1.0.1", OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
+const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
 export default BitmapSDK;
