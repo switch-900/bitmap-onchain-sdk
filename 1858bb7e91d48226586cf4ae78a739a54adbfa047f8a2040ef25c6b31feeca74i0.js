@@ -455,6 +455,31 @@ async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = nu
     (t === r || (t - i + 1) % 250 == 0) && await persistBitmapSearch(e, t);
 } return null; }; if (t)
     return await r(); const n = r().finally(() => bitmapPromiseCache.delete(e)); return bitmapPromiseCache.set(e, n), await n; }
+export async function scanBitmapClaim(e, { maxScanBlocks: t = 64, startHeight: a = null, forceRefresh: r = !1, persist: n = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
+    throw new TypeError("maxScanBlocks must be 1..10000"); const i = await getChainHeightCached(); if (e > i)
+    return { state: "future", bitmapNumber: e, tipHeight: i, complete: !0 }; if (!r) {
+    const t = await storageGetBitmapSafe(e);
+    if (!0 === t?.validated)
+        return { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: t.height, ...storedBitmapToValidation(t) };
+} if (e < OLD_OCI_LIMIT) {
+    let t = null;
+    try {
+        t = await indexInscriptionId(e);
+    }
+    catch { } const a = await verifyBitmapCandidate(e, t, { forceRefresh: r });
+    if (a) {
+        const t = a.info || await getInscriptionInfo(a.id, { forceRefresh: r }), o = normaliseHeight(t), s = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: a.id, sat: t?.sat ?? null, height: o, number: t?.number ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, source: "legacy-oci" };
+        return n && (await persistBitmapRecord(s, i), await persistBitmapSearch(e, o, a.id, o)), { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: o, ...s };
+    }
+} const o = r ? null : await storageGetBitmapSearchSafe(e); let c = Number.isSafeInteger(a) ? Math.max(e, a) : e; !r && !Number.isSafeInteger(a) && o && Number.isSafeInteger(o.scannedThroughHeight) && (c = Math.max(c, o.scannedThroughHeight + 1)); if (c > i)
+    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: i, scannedThroughHeight: i }; const l = Math.min(i, c + t - 1); for (let t = c; t <= l; t++) {
+    const a = await getParsedBlockInscriptionsWithRetry(t);
+    for (const r of a)
+        if (isValidBitmapParsedInscription(r, e)) {
+            const a = await getInscriptionInfo(r.id, { forceRefresh: !1 }), o = normaliseHeight(a), c = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: r.id, sat: a?.sat ?? null, height: o, number: a?.number ?? null, address: a?.address ?? null, output: a?.output ?? null, satpoint: a?.satpoint ?? null, timestamp: a?.timestamp ?? null, source: "bounded-live-block-scan" };
+            return foundBitmapCache.set(e, r), n && (await persistBitmapSearch(e, t, r.id, t), await persistBitmapRecord(c, i)), { state: "found", complete: !0, tipHeight: i, scannedThroughHeight: t, ...c };
+        }
+} return n && await persistBitmapSearch(e, l), { state: "missing", bitmapNumber: e, complete: l >= i, tipHeight: i, scannedThroughHeight: l, nextHeight: l < i ? l + 1 : null }; }
 export async function getBitmapInscriptionId(e, { forceRefresh: t = !1 } = {}) { if (checkBitmapNumber(e), !t) {
     const t = await storageGetBitmapSafe(e);
     if (!0 === t?.validated && "string" == typeof t.inscriptionId)
@@ -713,7 +738,7 @@ async function fetchRecursiveBlockOutputTotals(e) { checkBitmapNumber(e); const 
     throw new Error("/r/block/" + e + " returned HTTP " + t.status); const a = await t.json(); return parseRawBlockOutputTotals(a, e); }
 async function fetchLiveMondrianPattern(e, t) { if ("function" != typeof t?.getSquareSize)
     throw new Error("Mondrian module does not export getSquareSize()"); const a = await fetchRecursiveBlockOutputTotals(e), r = await getBlockTransactionCount(e); if (a.length !== r)
-    throw new Error("Mondrian transaction count mismatch for block " + e + ": raw-block=" + a.length + ", blockinfo=" + r); const n = validateMondrianPattern(a.map(e => t.getSquareSize(e)), e); return { pattern: n, source: "recursive-raw-block" }; }
+    throw new Error("Mondrian transaction count mismatch for block " + e + ": raw-block=" + a.length + ", blockinfo=" + r); const n = validateMondrianPattern(a.map(e => t.getSquareSize(e)), e); return { pattern: n, values: a, source: "recursive-raw-block" }; }
 async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a = !0 } = {}) { checkBitmapNumber(e); const r = await storageGetMondrianSafe(e); if (!t && Array.isArray(r?.pattern) && r.pattern.length > 0)
     return { pattern: validateMondrianPattern(r.pattern, e), source: r.patternSource ?? r.source ?? "indexeddb", cacheSource: "indexeddb", mondrianModule: await loadMondrianModule() }; const n = await loadMondrianModule(); if (!t && "function" == typeof n?.getPatternArray) {
     const t = validateMondrianPattern(n.getPatternArray(e), e);
@@ -733,9 +758,9 @@ export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, include
         return storedMondrianToPublic(t);
     if (mondrianCache.has(s))
         return mondrianCache.get(s);
-} const { pattern: c, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
+} const { pattern: c, values: k = null, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
     throw new Error("Mondrian module does not export MondrianLayout"); let w = null; if (v) {
-    w = await fetchRecursiveBlockOutputTotals(e);
+    w = Array.isArray(k) ? k : await fetchRecursiveBlockOutputTotals(e);
     if (w.length !== c.length)
         throw new Error("Mondrian transaction value count mismatch for block " + e + ": values=" + w.length + ", pattern=" + c.length);
 } const d = new u.MondrianLayout(c), p = "function" == typeof d.getSize ? d.getSize() : { width: d.width, height: d.height }; if (!Number.isFinite(p?.width) || !Number.isFinite(p?.height) || !Array.isArray(d?.slots))
@@ -970,5 +995,5 @@ export const storage = Object.freeze({ ready: async () => await initialiseStorag
         catch { }
         storageChannel = null;
     } storageDbPromise && storageDbPromise.then(e => e?.close()).catch(() => { }), storageDbPromise = null, storageInitialisedPromise = null; } });
-const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
+const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
 export default BitmapSDK;
