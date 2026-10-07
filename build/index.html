@@ -97,7 +97,23 @@ const sat =
   await BitmapSDK.getBitmapData(
     177700
   )</pre>
-<p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p>
+<p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p><p>For interactive maps, use bounded resumable discovery instead of blocking on an unbounded post-OCI scan:</p>
+<pre class="code">const scan =
+  await BitmapSDK.scanBitmapClaim(
+    950000,
+    {
+      maxScanBlocks: 64
+    }
+  )
+
+if (scan.state === 'found') {
+  console.log(scan.inscriptionId)
+}
+
+if (scan.state === 'missing' && !scan.complete) {
+  console.log(scan.scannedThroughHeight)
+}</pre>
+<p>The SDK owns the resume point from persisted scan progress, so callers cannot skip unscanned heights and later treat a hit as canonical.</p>
 </section>
 <section id="parcel">
 <h2>Parcel validation</h2>
@@ -303,6 +319,7 @@ watcher.stop()</pre>
 <h2>API</h2>
 <table><thead><tr><th>Area</th><th>Function</th><th>Purpose</th></tr></thead><tbody>
 <tr><td>Bitmap</td><td><code>validateBitmap()</code></td><td>Validate the canonical Bitmap claim.</td></tr>
+<tr><td>Bitmap</td><td><code>scanBitmapClaim()</code></td><td>Bound and resume Bitmap claim discovery without blocking an interactive application on a full scan to tip.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapData()</code></td><td>High-level application-ready Bitmap data.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapInscriptionId()</code></td><td>Return the canonical Bitmap inscription ID.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapSat()</code></td><td>Return the sat containing the canonical Bitmap.</td></tr>
@@ -493,6 +510,22 @@ const bitmapSat =
   )
 
 Only treat a Bitmap as canonical when Bitmap SDK says it is.
+
+For interactive Bitmap discovery where a full post-OCI scan
+could block the UI:
+
+const scan =
+  await BitmapSDK.scanBitmapClaim(
+    950000,
+    {
+      maxScanBlocks: 64
+    }
+  )
+
+scan.complete === false means the SDK has safely scanned only
+part of the required range. Do not reinterpret that as
+"No Bitmap exists". Resume later; the SDK persists trusted
+scan progress.
 
 PARCELS
 
