@@ -97,7 +97,23 @@ const sat =
   await BitmapSDK.getBitmapData(
     177700
   )</pre>
-<p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p>
+<p>The historical &lt;942k OCI is used as an accelerator for older Bitmaps. The SDK verifies canonical claims and can fall back to live block scanning where required.</p><p>For interactive maps, use bounded resumable discovery instead of blocking on an unbounded post-OCI scan:</p>
+<pre class="code">const scan =
+  await BitmapSDK.scanBitmapClaim(
+    950000,
+    {
+      maxScanBlocks: 64
+    }
+  )
+
+if (scan.state === 'found') {
+  console.log(scan.inscriptionId)
+}
+
+if (scan.state === 'missing' && !scan.complete) {
+  console.log(scan.scannedThroughHeight)
+}</pre>
+<p>The SDK owns the resume point from persisted scan progress, so callers cannot skip unscanned heights and later treat a hit as canonical.</p>
 </section>
 <section id="parcel">
 <h2>Parcel validation</h2>
@@ -151,6 +167,25 @@ for (const slot of mondrian.slots) {
   await BitmapSDK.getBitmapPattern(
     177700
   )</pre>
+<p>Inspect whether that pattern came from the canonical on-chain pattern index:</p>
+<pre class="code">const patternInfo =
+  await BitmapSDK.getBitmapPatternInfo(
+    177700
+  )
+
+console.log(patternInfo.source)
+console.log(patternInfo.indexed)
+console.log(patternInfo.cached)</pre>
+<p>Request exact transaction output totals only when they are needed. This deliberately uses the recursive raw block path because the compact pattern index stores size classes, not exact values.</p>
+<pre class="code">const exact =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeValues: true
+    }
+  )
+
+console.log(exact.slots[0].valueSats)</pre>
 </section>
 <section id="tree">
 <h2>Children and provenance</h2>
@@ -284,6 +319,7 @@ watcher.stop()</pre>
 <h2>API</h2>
 <table><thead><tr><th>Area</th><th>Function</th><th>Purpose</th></tr></thead><tbody>
 <tr><td>Bitmap</td><td><code>validateBitmap()</code></td><td>Validate the canonical Bitmap claim.</td></tr>
+<tr><td>Bitmap</td><td><code>scanBitmapClaim()</code></td><td>Bound and resume Bitmap claim discovery without blocking an interactive application on a full scan to tip.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapData()</code></td><td>High-level application-ready Bitmap data.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapInscriptionId()</code></td><td>Return the canonical Bitmap inscription ID.</td></tr>
 <tr><td>Bitmap</td><td><code>getBitmapSat()</code></td><td>Return the sat containing the canonical Bitmap.</td></tr>
@@ -294,7 +330,8 @@ watcher.stop()</pre>
 <tr><td>Parcel</td><td><code>getParcelInscriptionId()</code></td><td>Return the canonical Parcel inscription ID.</td></tr>
 <tr><td>Parcel</td><td><code>getParcelData()</code></td><td>Return high-level Parcel data.</td></tr>
 <tr><td>Geometry</td><td><code>getBitmapPattern()</code></td><td>Return the deterministic transaction-size pattern.</td></tr>
-<tr><td>Geometry</td><td><code>getBitmapMondrian()</code></td><td>Return deterministic Parcel coordinates and sizes.</td></tr>
+<tr><td>Geometry</td><td><code>getBitmapPatternInfo()</code></td><td>Return pattern provenance, including whether it came from the canonical on-chain pattern index.</td></tr>
+<tr><td>Geometry</td><td><code>getBitmapMondrian()</code></td><td>Return deterministic Parcel coordinates and sizes; use <code>includeValues:true</code> only when exact transaction totals are required.</td></tr>
 <tr><td>Structure</td><td><code>getChildrenTree()</code></td><td>Build a parent / child provenance graph.</td></tr>
 <tr><td>Structure</td><td><code>getBitmapTree()</code></td><td>Combine Bitmap provenance, Parcels and reinscriptions.</td></tr>
 <tr><td>Structure</td><td><code>getReinscriptionChain()</code></td><td>Return ordered same-sat inscription history.</td></tr>
@@ -474,6 +511,22 @@ const bitmapSat =
 
 Only treat a Bitmap as canonical when Bitmap SDK says it is.
 
+For interactive Bitmap discovery where a full post-OCI scan
+could block the UI:
+
+const scan =
+  await BitmapSDK.scanBitmapClaim(
+    950000,
+    {
+      maxScanBlocks: 64
+    }
+  )
+
+scan.complete === false means the SDK has safely scanned only
+part of the required range. Do not reinterpret that as
+"No Bitmap exists". Resume later; the SDK persists trusted
+scan progress.
+
 PARCELS
 
 const parcel =
@@ -546,6 +599,28 @@ const pattern =
   await BitmapSDK.getBitmapPattern(
     177700
   )
+
+const patternInfo =
+  await BitmapSDK.getBitmapPatternInfo(
+    177700
+  )
+
+patternInfo.indexed === true means the pattern came from
+the canonical on-chain pattern index.
+
+When exact transaction output totals are required:
+
+const exactMondrian =
+  await BitmapSDK.getBitmapMondrian(
+    177700,
+    {
+      includeValues: true
+    }
+  )
+
+slot.valueSats is then the exact transaction output total.
+Do not request includeValues for broad map rendering unless needed,
+because it deliberately uses the recursive raw block path.
 
 Use Bitmap SDK geometry rather than inventing another Bitmap layout.
 
