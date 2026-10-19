@@ -50,7 +50,7 @@ test("IndexedDB survives a new SDK instance, resumes and rewinds after reorg", a
   try {
     const ready = await first.storage.ready();
     assert.equal(ready.available, true);
-    assert.equal(ready.dbVersion, 3);
+    assert.equal(ready.dbVersion, 4);
     const a = await first.indexBitmapBlocks({ maxBlocks: 2, confirmations: 0 });
     assert.equal(a.startHeight, 942000);
     assert.equal(a.scannedThroughHeight, 942001);
