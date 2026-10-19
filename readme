@@ -5,7 +5,7 @@ One on-chain JS SDK for:
 • Parcel validation + tie-breaks
 • Mondrian geometry
 • provenance + reinscriptions
-• shared IndexedDB caching
+• shared IndexedDB caching and reusable block-coverage indexing
 • live block watching
 
 One import. No rebuilding the same Bitmap logic in every app.
@@ -145,6 +145,82 @@ in memory even when IndexedDB is unavailable, and persists it when storage is
 available. Each saved checkpoint is tied to its block hash; if that hash changes,
 the SDK discards the cursor and restarts from the Bitmap height. A caller cannot
 skip unscanned heights and then treat a later claim as canonical.
+
+
+---
+
+# Shared Bitmap block index (v1.0.3)
+
+Bitmap SDK now records **per-block Bitcoin coverage** in a separate IndexedDB
+store named `bitmapBlockIndex`. Each record saves the height, validated block
+hash and minimal valid raw-text Bitmap claim candidates. It **also records empty
+blocks**, so an earlier scan can accelerate a different Bitmap lookup.
+
+The SDK does **not** equate an indexed candidate with a canonical winner.
+Lookups still proceed in ascending Bitcoin height order, verify candidate
+inscriptions against their genesis-block raw bodies, reject invalid and
+premature claims, and prefer the earliest valid claim. The shared index is
+local browser acceleration, not a central authority.
+
+### Opt-in bounded background range indexing
+
+```js
+const summary = await BitmapSDK.indexBitmapBlocks({
+  // Omit startHeight to resume the previously indexed modern range.
+  // Use an explicit height to backfill historical Bitcoin blocks.
+  maxBlocks: 256,     // cap each invocation, 1..2048
+  concurrency: 8,     // parallel block requests, 1..16
+  confirmations: 6,   // skip the most recent 6 blocks
+  onProgress: p => {
+    console.log(p.height, p.processedBlocks, p.fetchedBlocks);
+  }
+});
+
+console.log(summary);
+// { startHeight, scannedThroughHeight, processedBlocks,
+//   fetchedBlocks, reusedBlocks, bitmapCandidates, nextHeight, ... }
+```
+
+Call this function repeatedly when building the browser's complete Bitmap
+coverage; it deliberately limits work per invocation. By default it starts
+at height **942,000**, where the SDK's modern live discovery begins. Earlier
+Bitmaps still use the existing historical OCI fallback; to build local coverage
+before the cutover, supply `startHeight` explicitly.
+
+The indexing cursor is saved in IndexedDB when available. Subsequent calls
+revisit a small recent overlap to check for reorganisations, while ensuring
+forward progress even with small `maxBlocks` settings. If IndexedDB is
+unavailable, the in-memory cache still helps during the current page session,
+but the cursor is not persisted.
+
+`scanBitmapClaim()` and `getBitmapInscriptionId()` automatically reuse
+this index. The existing `watchBlocks()` also adds scanned blocks to the
+shared coverage store, allowing newly mined blocks to participate in future
+lookups without another raw-block download.
+
+### Trust, reorganisation and performance notes
+
+- Before reusing a stored block, the SDK confirms its stored block hash
+  against `/r/blockhash/<height>`. If it changes, affected local canonical
+  caches and search checkpoints are rewound before fetching current data.
+- New raw-block indexing checks the height's hash both before and after parsing
+  to avoid persisting an index across a detected reorganisation.
+- Scans run concurrently in 16-height batches, but **candidate selection is
+  processed in ascending height order**, even when requests finish out of order.
+- A previously covered block ordinarily needs a lightweight hash check rather
+  than another `/r/block/<height>` raw download. This lowers raw-block bytes
+  and parsing effort but does **not** eliminate blockchain requests.
+- IndexedDB belongs to the browser origin. It is **not a shared index between
+  unrelated browsers or inscription origins**, and it is not an on-chain
+  snapshot.
+- This is a source-level optimisation; live full-chain performance and
+  persistent IndexedDB/reorganisation behaviour need real-browser validation.
+  Do not treat an incomplete local range as evidence a Bitmap is unclaimed.
+
+The v1.0.3 database upgrade adds the block store (schema version 3) while
+preserving the validation protocol version, so compatible existing cache
+records are not deliberately discarded.
+
 
 ---
 
@@ -683,6 +759,7 @@ scanBitmapClaim()
 getBitmapData()
 getBitmapInscriptionId()
 getBitmapSat()
+indexBitmapBlocks()
 syncBitmap()
 ```
 
@@ -841,7 +918,7 @@ suitable for an on-chain JavaScript inscription.
 # Version
 
 ```text
-Bitmap SDK v1.0.1
+Bitmap SDK v1.0.3
 ```
 
 Canonical SDK sat:
