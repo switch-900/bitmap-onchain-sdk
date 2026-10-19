@@ -526,8 +526,8 @@ async function getIndexedBitmapBlockClaims(height, { forceRefresh = false, persi
         const claims = bitmapClaimsFromParsedBlock(height, parsed);
         const saved = { height, hash: after, claims, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() };
         if (persist && indexedDbAvailable()) {
-            await initialiseStorage();
-            if (!await idbPut("bitmapBlockIndex", saved))
+            const status = await initialiseStorage();
+            if (status.available && !await idbPut("bitmapBlockIndex", saved) && indexedDbAvailable())
                 throw new Error("Failed to persist Bitmap block " + height);
         }
         rememberBitmapBlockClaim(saved);
@@ -547,8 +547,8 @@ async function persistParsedBitmapBlock(height, hash, inscriptions) {
         protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now()
     };
     if (indexedDbAvailable()) {
-        await initialiseStorage();
-        if (!await idbPut("bitmapBlockIndex", record))
+        const status = await initialiseStorage();
+        if (status.available && !await idbPut("bitmapBlockIndex", record) && indexedDbAvailable())
             throw new Error("Unable to save watched Bitmap block " + height);
     }
     rememberBitmapBlockClaim(record);
