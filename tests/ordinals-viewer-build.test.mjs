@@ -9,6 +9,7 @@ const html = await readFile(file, "utf8");
 const consoleJs = await readFile(consoleFile, "utf8");
 const profilerJs = await readFile(new URL("./ordinals-mondrian-profiler-console.js", import.meta.url), "utf8");
 const hexJs = await readFile(new URL("./ordinals-hex-benchmark-console.js", import.meta.url), "utf8");
+const packJs = await readFile(new URL("./ordinals-pattern-packing-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -56,4 +57,22 @@ test("840000 hex decoder benchmark parses and contains only same-origin recursiv
   assert.match(hexJs,/Uint8Array\.fromHex\(hex\)/);
   assert.match(hexJs,/report\.equalBytes=identical/);
   assert.equal(/https?:\/\/[^"' ]+/.test(hexJs),false);
+});
+
+test("840000 compact Mondrian pattern probe has valid syntax, local recursion and exact nibble roundtrip",()=>{
+  assert.doesNotThrow(()=>new Script(packJs,{filename:"ordinals-pattern-packing-console.js"}));
+  assert.match(packJs,/getBitmapPattern\(HEIGHT,\{forceLive:true\}\)/);
+  assert.match(packJs,/const HEIGHT = 840000/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(packJs),false);
+  const beginning=packJs.indexOf("function sizeToNibble");
+  const ending=packJs.indexOf("const sdk = ",beginning);
+  assert.ok(beginning>0 && ending>beginning);
+  const helpers=packJs.slice(beginning,ending);
+  const api=new Function(helpers+"\nreturn {encode,decode};")();
+  const sizes=[1,9,3,8,6,7,2];
+  const encoded=api.encode(sizes);
+  assert.deepEqual(Array.from(encoded),[0x19,0x38,0x67,0x20]);
+  assert.deepEqual(api.decode(encoded,sizes.length),sizes);
+  assert.throws(()=>api.encode([0]),/Invalid Mondrian/);
+  assert.throws(()=>api.decode(Uint8Array.of(0),2),/Invalid Mondrian/);
 });
