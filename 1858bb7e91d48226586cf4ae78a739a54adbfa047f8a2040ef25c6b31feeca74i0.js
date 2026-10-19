@@ -1001,25 +1001,128 @@ async function resolveBitmapPattern(height, {
 }
 export async function getBitmapPattern(e, t = {}) { return (await resolveBitmapPattern(e, t)).pattern.slice(); }
 export async function getBitmapPatternInfo(e, t = {}) { const { pattern: a, source: r, cacheSource: n = null } = await resolveBitmapPattern(e, t); return { bitmapNumber: e, pattern: a.slice(), source: r, indexed: "on-chain-pattern-index" === r, cached: "indexeddb" === n }; }
-export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v && !n) {
-    const cached = await storageGetMondrianSafe(e);
-    // Stored base layouts omit derived gaps unless includeEmptySpaces was
-    // requested. Never silently return incomplete geometry from IndexedDB.
-    if (Array.isArray(cached?.slots) && (!t || Array.isArray(cached.emptySpaces)))
-        return storedMondrianToPublic(cached);
-    if (mondrianCache.has(s))
-        return mondrianCache.get(s);
-} const { pattern: c, values: k = null, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
-    throw new Error("Mondrian module does not export MondrianLayout"); let w = null; if (v) {
-    w = Array.isArray(k) ? k : await fetchRecursiveBlockOutputTotals(e);
-    if (w.length !== c.length)
-        throw new Error("Mondrian transaction value count mismatch for block " + e + ": values=" + w.length + ", pattern=" + c.length);
-} const d = new u.MondrianLayout(c), p = "function" == typeof d.getSize ? d.getSize() : { width: d.width, height: d.height }; if (!Number.isFinite(p?.width) || !Number.isFinite(p?.height) || !Array.isArray(d?.slots))
-    throw new Error("Mondrian module returned an invalid layout"); let m = null, h = null; if (a && (h = await validateBitmap(e, { forceRefresh: !1, persist: o }), m = new Map, h.valid)) {
-    const t = await getBitmapParcels(e, { forceRefresh: r, requireCurrent: !0, persist: o });
-    for (const e of t.validParcels || [])
-        m.set(e.parcelNumber, e);
-} const b = d.slots.map((t, r) => { const n = m?.get(r) || null; return { parcelNumber: r, name: r + "." + e + ".bitmap", x: t.position.x, y: t.position.y, size: t.size, ...v ? { valueSats: w?.[r] ?? null } : {}, ...a ? { claimed: Boolean(n), inscriptionId: n?.id ?? null } : {} }; }), g = t ? d.fillEmptySpaces(!0).map(e => ({ x: e.position.x, y: e.position.y, size: e.size })) : void 0, f = { bitmapNumber: e, source: l, patternSource: l, indexed: "on-chain-pattern-index" === l, cacheSource: q, transactionCount: c.length, pattern: c.slice(), width: p.width, height: p.height, length: Number.isFinite(d.length) ? d.length : null, slots: b, ...t ? { emptySpaces: g } : {}, ...a ? { bitmapClaimed: Boolean(h?.valid), bitmapInscriptionId: h?.inscriptionId ?? null } : {} }; return o && !a && !v && await persistMondrian(f), a || mondrianCache.set(s, f), f; }
+export async function getBitmapMondrian(bitmapNumber, {
+    includeEmptySpaces = false, includeClaims = false, includeValues = false,
+    forceRefresh = false, forceLive = false, allowLiveFallback = true,
+    persist = true, onTiming = null
+} = {}) {
+    checkBitmapNumber(bitmapNumber);
+    if (onTiming !== null && typeof onTiming !== "function")
+        throw new TypeError("onTiming must be a function or null");
+    const totalStarted = mondrianNow();
+    const key = [bitmapNumber, includeEmptySpaces ? 1 : 0, includeClaims ? 1 : 0,
+        includeValues ? 1 : 0, forceLive ? 1 : 0, allowLiveFallback ? 1 : 0].join(":");
+    let cachedRecord = undefined;
+    if (!includeClaims && !forceRefresh && !includeValues && !forceLive) {
+        const cacheReadStarted = mondrianNow();
+        cachedRecord = await storageGetMondrianSafe(bitmapNumber);
+        reportMondrianStage(onTiming, "indexeddb-read", cacheReadStarted, { bitmapNumber });
+        if (Array.isArray(cachedRecord?.slots) &&
+            (!includeEmptySpaces || Array.isArray(cachedRecord.emptySpaces))) {
+            const result = storedMondrianToPublic(cachedRecord);
+            reportMondrianStage(onTiming, "total", totalStarted, {
+                bitmapNumber, source: "indexeddb", cacheHit: true, slots: result.slots.length
+            });
+            return result;
+        }
+        if (mondrianCache.has(key)) {
+            const result = mondrianCache.get(key);
+            reportMondrianStage(onTiming, "total", totalStarted, {
+                bitmapNumber, source: "memory", cacheHit: true, slots: result.slots.length
+            });
+            return result;
+        }
+    }
+    const patternStarted = mondrianNow();
+    const { pattern, values = null, source, cacheSource = null, mondrianModule } =
+        await resolveBitmapPattern(bitmapNumber, {
+            forceLive, allowLiveFallback, onTiming, cachedRecord
+        });
+    reportMondrianStage(onTiming, "pattern-resolution", patternStarted, {
+        bitmapNumber, source, transactions: pattern.length
+    });
+    if ("function" != typeof mondrianModule?.MondrianLayout)
+        throw new Error("Mondrian module does not export MondrianLayout");
+    let valueTotals = null;
+    if (includeValues) {
+        valueTotals = Array.isArray(values)
+            ? values : await fetchRecursiveBlockOutputTotals(bitmapNumber, onTiming);
+        if (valueTotals.length !== pattern.length)
+            throw new Error("Mondrian transaction value count mismatch for block " +
+                bitmapNumber + ": values=" + valueTotals.length + ", pattern=" + pattern.length);
+    }
+    let started = mondrianNow();
+    const layout = new mondrianModule.MondrianLayout(pattern);
+    const dimensions = "function" == typeof layout.getSize
+        ? layout.getSize() : { width: layout.width, height: layout.height };
+    if (!Number.isFinite(dimensions?.width) || !Number.isFinite(dimensions?.height) ||
+        !Array.isArray(layout?.slots))
+        throw new Error("Mondrian module returned an invalid layout");
+    reportMondrianStage(onTiming, "layout-construction", started, {
+        bitmapNumber, slots: layout.slots.length
+    });
+    let claimMap = null, bitmap = null;
+    if (includeClaims) {
+        started = mondrianNow();
+        bitmap = await validateBitmap(bitmapNumber, { forceRefresh: false, persist });
+        claimMap = new Map();
+        if (bitmap.valid) {
+            const parcels = await getBitmapParcels(bitmapNumber, {
+                forceRefresh, requireCurrent: true, persist
+            });
+            for (const parcel of parcels.validParcels || [])
+                claimMap.set(parcel.parcelNumber, parcel);
+        }
+        reportMondrianStage(onTiming, "claim-resolution", started, {
+            bitmapNumber, claims: claimMap.size
+        });
+    }
+    started = mondrianNow();
+    const slots = layout.slots.map((slot, ordinal) => {
+        const claim = claimMap?.get(ordinal) || null;
+        return {
+            parcelNumber: ordinal, name: ordinal + "." + bitmapNumber + ".bitmap",
+            x: slot.position.x, y: slot.position.y, size: slot.size,
+            ...includeValues ? { valueSats: valueTotals?.[ordinal] ?? null } : {},
+            ...includeClaims ? { claimed: Boolean(claim), inscriptionId: claim?.id ?? null } : {}
+        };
+    });
+    reportMondrianStage(onTiming, "slot-mapping", started, {
+        bitmapNumber, slots: slots.length
+    });
+    let gaps;
+    if (includeEmptySpaces) {
+        started = mondrianNow();
+        gaps = layout.fillEmptySpaces(true).map(slot => ({
+            x: slot.position.x, y: slot.position.y, size: slot.size
+        }));
+        reportMondrianStage(onTiming, "empty-space-construction", started, {
+            bitmapNumber, emptySpaces: gaps.length
+        });
+    }
+    const result = {
+        bitmapNumber, source, patternSource: source,
+        indexed: source === "on-chain-pattern-index", cacheSource,
+        transactionCount: pattern.length, pattern: pattern.slice(),
+        width: dimensions.width, height: dimensions.height,
+        length: Number.isFinite(layout.length) ? layout.length : null,
+        slots,
+        ...includeEmptySpaces ? { emptySpaces: gaps } : {},
+        ...includeClaims ? { bitmapClaimed: Boolean(bitmap?.valid),
+            bitmapInscriptionId: bitmap?.inscriptionId ?? null } : {}
+    };
+    if (persist && !includeClaims && !includeValues) {
+        started = mondrianNow();
+        await persistMondrian(result);
+        reportMondrianStage(onTiming, "indexeddb-persist", started, { bitmapNumber });
+    }
+    if (!includeClaims)
+        mondrianCache.set(key, result);
+    reportMondrianStage(onTiming, "total", totalStarted, {
+        bitmapNumber, source, cacheHit: false, slots: slots.length
+    });
+    return result;
+}
 function treeNodeFromInfo(e, t, a = null) { return { id: e, depth: a, height: normaliseHeight(t), number: t?.number ?? null, sat: t?.sat ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, charms: Array.isArray(t?.charms) ? [...t.charms] : [] }; }
 function buildNestedTree(e, t, a) { const r = new Map(t.map(e => [e.id, e])), n = new Map, i = new Map; for (const e of a)
     "parent-child" === e.type && (n.has(e.from) || n.set(e.from, []), n.get(e.from).push(e.to), i.set(e.to, (i.get(e.to) || 0) + 1)); const o = new Set; return function t(a, s = new Set) { const c = r.get(a) || { id: a }; if (s.has(a))
