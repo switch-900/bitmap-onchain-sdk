@@ -144,7 +144,8 @@ v1.0.3 adds the optional \`onTiming\` callback, which reports:
 - \`mondrian-module\`
 - \`raw-block-http\`
 - \`raw-block-json\`
-- \`raw-block-transaction-parser\`
+- \`raw-block-hex-decoder\` (text-to-byte conversion)
+- \`raw-block-transaction-parser\` (includes decoding)
 - \`block-transaction-count\`
 - \`pattern-derivation\`
 - \`pattern-resolution\` (inclusive of nested stages)
@@ -180,3 +181,7 @@ has been profiled against the current canonical version.
 
 - [Ordinal Theory Handbook: recursion](https://docs.ordinals.com/inscriptions/recursion.html)
 - [Ordinal Theory Handbook: inscription sandboxing](https://docs.ordinals.com/inscriptions.html)
+
+### Raw block hexadecimal conversion
+
+The development SDK uses native `Uint8Array.fromHex()` on supporting browsers and a strict validated fallback elsewhere. This removes the older per-byte `parseInt(hex.slice())` loop on modern browsers. A 6-million-character synthetic V8 benchmark showed conversion much faster, but that **does not measure total Bitmap load time**: HTTP transfer and JSON body reading are separate bottlenecks. Compare the detailed `raw-block-hex-decoder` timing in a real staged viewer before attributing an end-to-end speedup.
