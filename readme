@@ -297,6 +297,82 @@ Applications should use the SDK result rather than implementing a separate tie-b
 
 ---
 
+
+## Compact Mondrian pattern manifests (experimental v1.0.3)
+
+Compact patterns can make Bitmap geometry portable without carrying an entire
+raw Bitcoin block. For block `840000`, an independently exported pattern with
+3,050 elements occupies **1,525 bytes** when nibble-packed. The user's browser
+gzip test produced **479 bytes**; offline Brotli quality 11 achieved **405
+bytes** for the exact same 1,525 bytes. Actual inscription payload and runtime
+size depend on the index representation and decoder.
+
+Use these **opt-in** public APIs:
+
+```js
+// Export an integrity-checked candidate from live recursive Bitcoin data.
+// "auto" tries built-in Brotli, then gzip, otherwise leaves the data unpacked.
+const manifest = await BitmapSDK.getBitmapPatternManifest(840000, {
+  forceLive: true,
+  compression: "auto" // or "none", "gzip", "brotli"
+})
+
+// Verify SHA-256, unpack size classes and inspect the derived pattern.
+// This does NOT establish independent on-chain authenticity.
+const decoded = await BitmapSDK.decodeBitmapPatternManifest(manifest)
+console.log(decoded.pattern.length, decoded.integrityVerified)
+
+// Geometry reconstruction does not fetch /r/block unless requested.
+const preview = await BitmapSDK.getBitmapGeometryFromManifest(manifest, {
+  includeEmptySpaces: true
+})
+console.log(preview.slots.length, preview.emptySpaces.length)
+console.log(preview.verifiedAgainstRawBlock) // false
+
+// Explicit canonical verification before allowing a new manifest into
+// the SDK's trusted, local IndexedDB pattern cache:
+await BitmapSDK.cacheBitmapPatternManifest(manifest)
+
+// Subsequent calls can reuse raw-verified compact pattern data.
+// Changed block hashes cause this cache to be skipped.
+const info = await BitmapSDK.getBitmapPatternInfo(840000)
+console.log(info.source)
+```
+
+For directly supplied size arrays, `packBitmapPattern(pattern)`,
+`unpackBitmapPattern(bytes, transactionCount)`, and
+`getBitmapGeometryFromPattern(height, pattern, {includeEmptySpaces:true})`
+are also available.
+
+**Brotli compatibility:** Native `DecompressionStream("brotli")` is not
+supported in every browser, including some Chromium browsers.
+`decodeBitmapPatternManifest(manifest, {brotliDecoder})` accepts an
+explicit async callback returning a `Uint8Array`, permitting a separately
+verified recursive on-chain Brotli decoder. The core SDK does **not** bundle
+an off-chain decompression dependency. Generating Brotli with
+`getBitmapPatternManifest(...,{compression:"brotli"})` requires native
+`CompressionStream("brotli")` support; otherwise encode Brotli offline and
+supply it as an external manifest.
+
+**Security and trust:** The manifest's SHA-256 authenticates nothing on its
+own if the publisher controls both the payload and checksum. A matching
+Bitcoin block hash and transaction count likewise do not prove that the
+nibble pattern was derived correctly. The preview API explicitly marks
+imported geometry `verifiedAgainstRawBlock: false` and **never inserts it
+into the trusted geometry cache**. The trusted cache import first recomputes
+the entire pattern from `/r/block/<height>` and checks hash stability.
+Cache entries store the raw-verified compressed representation separately
+from existing full Mondrian layouts and re-check the block hash on reads.
+These protections are deliberate; simply supplying `verifyAgainstRawBlock:
+false` cannot bypass trusted import.
+
+There is **no automatic fetch from an unverified external manifest URL** and
+no newly inscribed on-chain index. The read-path first prefers the existing
+full Mondrian geometry record, then the independently verified local compact
+pattern store before falling back to the existing on-chain Mondrian pattern
+module and raw Bitcoin block. Exact transaction output values still require
+the raw block. This is an experimental SDK branch, not an inscribed release.
+
 # Mondrian geometry
 
 Get the deterministic Bitmap layout:
