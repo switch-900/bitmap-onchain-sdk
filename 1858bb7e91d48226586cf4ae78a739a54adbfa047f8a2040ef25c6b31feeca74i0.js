@@ -1,5 +1,5 @@
 /*
- * Bitmap SDK v1.0.2
+ * Bitmap SDK v1.0.3
  *
  * On-chain Bitmap development SDK.
  *
@@ -36,13 +36,13 @@
 import { getBitmapSat as indexSat, getBitmapInscriptionId as indexInscriptionId } from "/content/942b5886158d57fc70cb8fb7d9bd4d37aa95b8b145be1a351326336b087262dbi0";
 import { fetchBlock, listInscriptions, toHex } from "/content/bbbb2172ebca174579884df1ad7487196c39e860b3aacdf4e052a33bf5ec31fai0";
 export const SDK_NAME = "Bitmap SDK";
-export const VERSION = "1.0.2";
+export const VERSION = "1.0.3";
 export const OLD_OCI_LIMIT = 942e3;
 export const MONDRIAN_MODULE_ID = "55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0";
 export const STORAGE_DB_NAME = "bitmap-sdk";
-export const STORAGE_DB_VERSION = 2;
+export const STORAGE_DB_VERSION = 3;
 export const STORAGE_PROTOCOL_VERSION = "bitmap-sdk-v1.0.1";
-const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapScanPromiseCache = new Map, bitmapSearchCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
+const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapScanPromiseCache = new Map, bitmapSearchCache = new Map, bitmapBlockClaimCache = new Map, bitmapBlockClaimPromiseCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
 let mondrianModulePromise = null, tipCache = { height: null, expiresAt: 0 };
 function getTtl(e, t) { const a = e.get(t); if (a) {
     if (!(Date.now() >= a.expiresAt))
@@ -159,9 +159,9 @@ function openStorageDb() { if (!indexedDbAvailable())
 }
 catch (e) {
     return void n(null, e);
-} r = setTimeout(() => n(null, new Error("IndexedDB open timed out")), 2500), t.onerror = () => n(null, t.error || new Error("Failed to open IndexedDB")), t.onblocked = () => n(null, new Error("IndexedDB upgrade blocked by another tab")), t.onupgradeneeded = () => { const e = t.result, a = t.transaction, r = (t, r) => e.objectStoreNames.contains(t) ? a.objectStore(t) : e.createObjectStore(t, r); r("meta", { keyPath: "key" }); const n = r("bitmaps", { keyPath: "bitmapNumber" }); ensureIndex(n, "inscriptionId", "inscriptionId"), ensureIndex(n, "height", "height"); const i = r("parcels", { keyPath: ["bitmapNumber", "parcelNumber"] }); ensureIndex(i, "bitmapNumber", "bitmapNumber"), ensureIndex(i, "inscriptionId", "id"), ensureIndex(i, "height", "height"), ensureIndex(r("bitmapState", { keyPath: "bitmapNumber" }), "childrenScannedThroughHeight", "childrenScannedThroughHeight"), r("mondrians", { keyPath: "bitmapNumber" }), r("blockHashes", { keyPath: "height" }), ensureIndex(r("childTrees", { keyPath: "rootId" }), "syncedThroughHeight", "syncedThroughHeight"), ensureIndex(r("satChains", { keyPath: "sat" }), "syncedThroughHeight", "syncedThroughHeight"); const o = r("parcelClaims", { keyPath: ["bitmapNumber", "id"] }); ensureIndex(o, "bitmapNumber", "bitmapNumber"), ensureIndex(o, "height", "height"); const s = r("bitmapSearch", { keyPath: "bitmapNumber" }); ensureIndex(s, "scannedThroughHeight", "scannedThroughHeight"); }, t.onsuccess = () => { const e = t.result; if (a)
+} r = setTimeout(() => n(null, new Error("IndexedDB open timed out")), 2500), t.onerror = () => n(null, t.error || new Error("Failed to open IndexedDB")), t.onblocked = () => n(null, new Error("IndexedDB upgrade blocked by another tab")), t.onupgradeneeded = () => { const e = t.result, a = t.transaction, r = (t, r) => e.objectStoreNames.contains(t) ? a.objectStore(t) : e.createObjectStore(t, r); r("meta", { keyPath: "key" }); const n = r("bitmaps", { keyPath: "bitmapNumber" }); ensureIndex(n, "inscriptionId", "inscriptionId"), ensureIndex(n, "height", "height"); const i = r("parcels", { keyPath: ["bitmapNumber", "parcelNumber"] }); ensureIndex(i, "bitmapNumber", "bitmapNumber"), ensureIndex(i, "inscriptionId", "id"), ensureIndex(i, "height", "height"), ensureIndex(r("bitmapState", { keyPath: "bitmapNumber" }), "childrenScannedThroughHeight", "childrenScannedThroughHeight"), r("mondrians", { keyPath: "bitmapNumber" }), r("blockHashes", { keyPath: "height" }), ensureIndex(r("childTrees", { keyPath: "rootId" }), "syncedThroughHeight", "syncedThroughHeight"), ensureIndex(r("satChains", { keyPath: "sat" }), "syncedThroughHeight", "syncedThroughHeight"); const o = r("parcelClaims", { keyPath: ["bitmapNumber", "id"] }); ensureIndex(o, "bitmapNumber", "bitmapNumber"), ensureIndex(o, "height", "height"); const s = r("bitmapSearch", { keyPath: "bitmapNumber" }); ensureIndex(s, "scannedThroughHeight", "scannedThroughHeight"), r("bitmapBlockIndex", { keyPath: "height" }); }, t.onsuccess = () => { const e = t.result; if (a)
     return void e.close(); e.onversionchange = () => { e.close(), storageDbPromise = null, storageInitialisedPromise = null; }, n(e); }; }); return storageDbPromise = e, e; }
-async function clearStorageForProtocolChange(e) { const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "meta"].filter(t => e.objectStoreNames.contains(t)); if (!t.length)
+async function clearStorageForProtocolChange(e) { const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "bitmapBlockIndex", "meta"].filter(t => e.objectStoreNames.contains(t)); if (!t.length)
     return !0; return await new Promise(a => { try {
     const r = e.transaction(t, "readwrite");
     for (const e of t)
@@ -450,6 +450,127 @@ async function verifyBitmapCandidate(e, t, { forceRefresh: a = !1 } = {}) { if (
 catch {
     return null;
 } }
+
+/* Shared local block coverage; empty blocks matter too. All winners are still
+ * selected by scanning ascending block height and validating the raw claim. */
+function bitmapClaimsFromParsedBlock(height, inscriptions) {
+    const claims = [];
+    for (let ordinal = 0; ordinal < inscriptions.length; ordinal++) {
+        const item = inscriptions[ordinal], name = parseBitmapName(strictClaimText(item));
+        if (name && name.bitmapNumber <= height && /^[0-9a-f]{64}i[0-9]+$/i.test(item?.id || ""))
+            claims.push({ bitmapNumber: name.bitmapNumber, id: item.id, ordinal });
+    }
+    return claims;
+}
+function rememberBitmapBlockClaim(record) {
+    bitmapBlockClaimCache.delete(record.height);
+    bitmapBlockClaimCache.set(record.height, record);
+    while (bitmapBlockClaimCache.size > 128)
+        bitmapBlockClaimCache.delete(bitmapBlockClaimCache.keys().next().value);
+}
+async function getIndexedBitmapBlockClaims(height, { forceRefresh = false, persist = true } = {}) {
+    checkBitmapNumber(height);
+    if (!forceRefresh && bitmapBlockClaimPromiseCache.has(height))
+        return await bitmapBlockClaimPromiseCache.get(height);
+    const work = async () => {
+        if (forceRefresh) {
+            bitmapBlockClaimCache.delete(height);
+            parsedBlockCache.delete(height);
+        }
+        let record = !forceRefresh ? bitmapBlockClaimCache.get(height) : null;
+        if (!record && !forceRefresh && indexedDbAvailable()) {
+            await initialiseStorage();
+            record = currentStoredRecord(await idbGet("bitmapBlockIndex", height));
+        }
+        if (record && /^[0-9a-f]{64}$/i.test(record.hash || "") &&
+            Array.isArray(record.claims) && record.claims.every(c =>
+                Number.isSafeInteger(c.bitmapNumber) && c.bitmapNumber >= 0 &&
+                c.bitmapNumber <= height && /^[0-9a-f]{64}i[0-9]+$/i.test(c.id || ""))) {
+            const currentHash = await getBlockHashWithRetry(height);
+            if (currentHash === record.hash) {
+                rememberBitmapBlockClaim(record);
+                return { height, hash: currentHash, claims: record.claims, cached: true };
+            }
+        }
+        // Parser memory caches cannot survive a height's hash changing.
+        bitmapBlockClaimCache.delete(height);
+        parsedBlockCache.delete(height);
+        const before = await getBlockHashWithRetry(height);
+        const parsed = await getParsedBlockInscriptionsWithRetry(height);
+        const after = await getBlockHashWithRetry(height);
+        if (before !== after) {
+            parsedBlockCache.delete(height);
+            throw new Error("Reorganisation while indexing block " + height);
+        }
+        const claims = bitmapClaimsFromParsedBlock(height, parsed);
+        const saved = { height, hash: after, claims, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() };
+        if (persist && indexedDbAvailable()) {
+            await initialiseStorage();
+            if (!await idbPut("bitmapBlockIndex", saved))
+                throw new Error("Failed to persist Bitmap block " + height);
+        }
+        rememberBitmapBlockClaim(saved);
+        return { height, hash: after, claims, cached: false };
+    };
+    if (forceRefresh) return await work();
+    const pending = work().finally(() => bitmapBlockClaimPromiseCache.delete(height));
+    bitmapBlockClaimPromiseCache.set(height, pending);
+    return await pending;
+}
+async function getBitmapBlockClaimsBatch(first, last, { concurrency = 8, persist = true, forceRefresh = false } = {}) {
+    const heights = Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    return await mapWithConcurrency(heights, concurrency, height =>
+        getIndexedBitmapBlockClaims(height, { persist, forceRefresh }));
+}
+/* Incremental browser index, resumable via IndexedDB. Explicit startHeight
+ * enables backfills; default begins at the legacy OCI cutover height. */
+export async function indexBitmapBlocks({
+    startHeight = null, endHeight = null, maxBlocks = 256, concurrency = 8,
+    confirmations = 6, persist = true, forceRefresh = false, onProgress = null
+} = {}) {
+    if (startHeight !== null) checkBitmapNumber(startHeight);
+    if (endHeight !== null) checkBitmapNumber(endHeight);
+    if (!Number.isSafeInteger(maxBlocks) || maxBlocks < 1 || maxBlocks > 2048)
+        throw new TypeError("maxBlocks must be 1..2048");
+    if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > 16)
+        throw new TypeError("concurrency must be 1..16");
+    if (!Number.isSafeInteger(confirmations) || confirmations < 0 || confirmations > 144)
+        throw new TypeError("confirmations must be 0..144");
+    if (onProgress !== null && typeof onProgress !== "function")
+        throw new TypeError("onProgress must be a function or null");
+    const tipHeight = await getChainHeightCached(), confirmedHeight = tipHeight - confirmations;
+    const resuming = startHeight === null;
+    let first = startHeight;
+    if (resuming) {
+        const cursor = persist && indexedDbAvailable() ? await getMetaValue("bitmapIndex:lastScannedHeight") : null;
+        first = Number.isSafeInteger(cursor) && cursor >= OLD_OCI_LIMIT
+            ? Math.max(OLD_OCI_LIMIT, cursor - 11) : OLD_OCI_LIMIT;
+    }
+    const last = Math.min(confirmedHeight, endHeight === null ? confirmedHeight : endHeight, first + maxBlocks - 1);
+    let processedBlocks = 0, fetchedBlocks = 0, reusedBlocks = 0, bitmapCandidates = 0;
+    for (let height = first; height <= last; height += 16) {
+        const batch = await getBitmapBlockClaimsBatch(height, Math.min(last, height + 15),
+            { concurrency, persist, forceRefresh });
+        for (const block of batch) {
+            processedBlocks++;
+            bitmapCandidates += block.claims.length;
+            if (block.cached) reusedBlocks++; else fetchedBlocks++;
+            if (onProgress) onProgress({
+                height: block.height, processedBlocks, fetchedBlocks, reusedBlocks, bitmapCandidates
+            });
+        }
+        if (resuming && persist && indexedDbAvailable())
+            await setMetaValue("bitmapIndex:lastScannedHeight", batch[batch.length - 1].height);
+    }
+    return {
+        startHeight: first, scannedThroughHeight: processedBlocks ? last : null,
+        tipHeight, confirmedHeight, processedBlocks, fetchedBlocks, reusedBlocks,
+        bitmapCandidates, complete: last >= confirmedHeight,
+        nextHeight: last < confirmedHeight ? Math.max(first, last + 1) : null,
+        source: "recursive-bitcoin-blocks-and-local-indexeddb"
+    };
+}
+
 async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = null } = {}) { if (checkBitmapNumber(e), t && foundBitmapCache.delete(e), !t && foundBitmapCache.has(e))
     return foundBitmapCache.get(e); if (!t && bitmapPromiseCache.has(e))
     return await bitmapPromiseCache.get(e); const r = async () => { const r = await getChainHeightCached(); if (e > r)
