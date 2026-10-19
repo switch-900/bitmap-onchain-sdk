@@ -8,6 +8,7 @@ const consoleFile = new URL("./ordinals-viewer-console.js", import.meta.url);
 const html = await readFile(file, "utf8");
 const consoleJs = await readFile(consoleFile, "utf8");
 const profilerJs = await readFile(new URL("./ordinals-mondrian-profiler-console.js", import.meta.url), "utf8");
+const hexJs = await readFile(new URL("./ordinals-hex-benchmark-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -47,4 +48,12 @@ test("840000 viewer performance probe is syntactically valid and read-only", () 
   assert.match(profilerJs, /globalThis\.fetch=nativeFetch/);
   assert.match(profilerJs, /onTiming:/);
   assert.equal(/https?:\/\/[^"' ]+/.test(profilerJs), false, "No off-chain fetch URLs are required");
+});
+
+test("840000 hex decoder benchmark parses and contains only same-origin recursive fetch",()=>{
+  assert.doesNotThrow(()=>new Script(hexJs,{filename:"ordinals-hex-benchmark-console.js"}));
+  assert.match(hexJs,/"\/r\/block\/" \+ height/);
+  assert.match(hexJs,/Uint8Array\.fromHex\(hex\)/);
+  assert.match(hexJs,/report\.equalBytes=identical/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(hexJs),false);
 });
