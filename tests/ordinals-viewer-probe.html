@@ -220,7 +220,7 @@ async function inspectBitmap(name, n) {
 }
 async function runSafe() {
   if (running) return;
-  running=true;el("run").disabled=true;el("index").disabled=true;el("reuse").disabled=true;el("reuse").disabled=true;
+  running=true;el("run").disabled=true;el("index").disabled=true;el("reuse").disabled=true;
   el("status").textContent="Executing bounded, read-only checks…";
   el("results").textContent="";report.tests=[];report.ranAt=new Date().toISOString();
   report.inputs = {
@@ -247,14 +247,14 @@ async function runSafe() {
       return pass(names.length+" required functions available");
     });
   } finally {
-    running=false;el("run").disabled=false;el("index").disabled=false;el("reuse").disabled=false;el("reuse").disabled=false;
+    running=false;el("run").disabled=false;el("index").disabled=false;el("reuse").disabled=false;
     el("status").textContent="Checks completed. Copy the JSON evidence below.";
     refresh();
   }
 }
 async function runIndex() {
   if(running) return;
-  running=true;el("run").disabled=true;el("index").disabled=true;
+  running=true;el("run").disabled=true;el("index").disabled=true;el("reuse").disabled=true;
   el("status").textContent="Indexing two confirmed Bitcoin blocks (may download full raw blocks)…";
   try {
     if (!await setup()) return;
@@ -299,7 +299,7 @@ async function runIndex() {
   }catch(err){
     result("v1.0.3 index benchmark","FAIL",0,String(err?.message||err));
   }finally{
-    running=false;el("run").disabled=false;el("index").disabled=false;
+    running=false;el("run").disabled=false;el("index").disabled=false;el("reuse").disabled=false;
     el("status").textContent="Index experiment finished. Copy JSON for analysis.";
     refresh();
   }
