@@ -39,6 +39,7 @@ textarea{width:100%;min-height:175px;font:12px/1.4 ui-monospace,monospace;color:
  <p><small>These are test inputs, not claims that either Bitmap is registered. The scanner is capped at 16 blocks per button press. A missing, incomplete lookup is not proof that a Bitmap is unclaimed.</small></p>
  <button id="run">Run read-only checks</button>
  <button id="index" class="secondary">Run v1.0.3 two-block cache benchmark</button>
+ <button id="reuse" class="secondary">Recheck saved blocks (after reload)</button>
  <button id="copy" class="secondary">Copy JSON report</button>
  <div id="status" aria-live="polite" class="muted">Ready. No network requests have been made.</div>
 </section>
@@ -219,7 +220,7 @@ async function inspectBitmap(name, n) {
 }
 async function runSafe() {
   if (running) return;
-  running=true;el("run").disabled=true;el("index").disabled=true;
+  running=true;el("run").disabled=true;el("index").disabled=true;el("reuse").disabled=true;el("reuse").disabled=true;
   el("status").textContent="Executing bounded, read-only checks…";
   el("results").textContent="";report.tests=[];report.ranAt=new Date().toISOString();
   report.inputs = {
@@ -246,7 +247,7 @@ async function runSafe() {
       return pass(names.length+" required functions available");
     });
   } finally {
-    running=false;el("run").disabled=false;el("index").disabled=false;
+    running=false;el("run").disabled=false;el("index").disabled=false;el("reuse").disabled=false;el("reuse").disabled=false;
     el("status").textContent="Checks completed. Copy the JSON evidence below.";
     refresh();
   }
@@ -303,8 +304,47 @@ async function runIndex() {
     refresh();
   }
 }
+async function rerunSaved() {
+  if(running)return;
+  running=true;el("run").disabled=true;el("index").disabled=true;el("reuse").disabled=true;
+  el("status").textContent="Reading cached coverage, without forcing a raw block download…";
+  try {
+    if(!await setup())return;
+    if(typeof sdk.indexBitmapBlocks!=="function") {
+      result("Cross-reload cache reuse","SKIP",0,"Needs the v1.0.3 SDK.");
+      return;
+    }
+    const h=tipHeight-8;
+    if(h<942000){
+      result("Cross-reload cache reuse","SKIP",0,"Not enough confirmed modern blocks.");
+      return;
+    }
+    const before=snapshot();
+    await check("Cross-reload cache reuse",async()=>{
+      const a=await sdk.indexBitmapBlocks({
+        startHeight:h,endHeight:h+1,maxBlocks:2,concurrency:2,confirmations:6,persist:true
+      });
+      const d=diff(before);
+      if(a.reusedBlocks!==2 || d.rawBlocks!==0) {
+        return {status:"INFO",evidence:"Coverage not fully cached: "+a.reusedBlocks+
+          "/2 records reused, "+d.rawBlocks+" raw blocks downloaded. Run cold index first, then reload.",
+          details:{output:a,requestDelta:d}};
+      }
+      return pass("Both persisted blocks reused; no raw block downloads; block hash checks="+d.blockHashes,{
+        output:a,requestDelta:d
+      });
+    });
+  }catch(err){
+    result("Cross-reload cache reuse","FAIL",0,String(err?.message||err));
+  }finally{
+    running=false;el("run").disabled=false;el("index").disabled=false;el("reuse").disabled=false;
+    el("status").textContent="Saved-coverage check finished.";
+    refresh();
+  }
+}
 el("run").addEventListener("click",runSafe);
 el("index").addEventListener("click",runIndex);
+el("reuse").addEventListener("click",rerunSaved);
 el("copy").addEventListener("click",async()=>{
   refresh();
   try { await navigator.clipboard.writeText(el("report").value); el("status").textContent="JSON report copied."; }
