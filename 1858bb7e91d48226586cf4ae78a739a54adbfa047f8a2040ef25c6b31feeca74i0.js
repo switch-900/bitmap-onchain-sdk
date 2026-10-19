@@ -912,7 +912,11 @@ function readUInt64LE(e, t, a) { if (t.offset + 8 > e.length)
     throw new Error("Truncated " + a); let r = 0n; for (let a = 0; a < 8; a++)
     r += BigInt(e[t.offset + a]) << (8n * BigInt(a)); t.offset += 8; if (r > BigInt(Number.MAX_SAFE_INTEGER))
     throw new Error(a + " exceeds safe integer range"); return Number(r); }
-function parseRawBlockOutputTotals(e, t) { const a = rawBlockHexToBytes(e, t), r = { offset: 80 }, n = readCompactSize(a, r, "block transaction count"); if (n < 1)
+function parseRawBlockOutputTotals(e, t, onTiming = null) {
+    const started = mondrianNow();
+    const a = rawBlockHexToBytes(e, t);
+    reportMondrianStage(onTiming, "raw-block-hex-decoder", started, { height: t, bytes: a.length });
+    const r = { offset: 80 }, n = readCompactSize(a, r, "block transaction count"); if (n < 1)
     throw new Error("Block " + t + " has no transactions"); const i = new Array(n); for (let e = 0; e < n; e++) {
     skipRawBytes(a, r, 4, "transaction version");
     let t = !1;
@@ -971,7 +975,7 @@ async function fetchRecursiveBlockOutputTotals(height, onTiming = null) {
     const hex = await response.json();
     reportMondrianStage(onTiming, "raw-block-json", started, { height, hexChars: "string" == typeof hex ? hex.length : null });
     started = mondrianNow();
-    const totals = parseRawBlockOutputTotals(hex, height);
+    const totals = parseRawBlockOutputTotals(hex, height, onTiming);
     reportMondrianStage(onTiming, "raw-block-transaction-parser", started, { height, transactions: totals.length });
     return totals;
 }
