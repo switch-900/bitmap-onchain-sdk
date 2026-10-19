@@ -57,10 +57,11 @@
     return new Uint8Array(await new Response(stream).arrayBuffer());
   }
 
-  const [pattern, blockHash] = await Promise.all([
-    sdk.getBitmapPattern(HEIGHT, {forceLive:true}),
-    sdk.getBlockHash(HEIGHT)
-  ]);
+  const blockHashBefore = await sdk.getBlockHash(HEIGHT);
+  const pattern = await sdk.getBitmapPattern(HEIGHT, {forceLive:true});
+  const blockHash = await sdk.getBlockHash(HEIGHT);
+  if (blockHashBefore !== blockHash)
+    throw Error("Bitcoin block hash changed while building the manifest; retry after chain stabilises");
   if (!Array.isArray(pattern) || !pattern.length)
     throw Error("Empty or invalid live block pattern");
   if (!/^[0-9a-f]{64}$/i.test(blockHash))
