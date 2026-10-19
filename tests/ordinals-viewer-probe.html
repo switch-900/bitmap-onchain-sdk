@@ -35,8 +35,9 @@ textarea{width:100%;min-height:175px;font:12px/1.4 ui-monospace,monospace;color:
   <label>Historical Bitmap (optional known claim)<input id="historical" type="number" min="0" step="1" value="177700"></label>
   <label>Modern Bitmap (bounded discovery)<input id="modern" type="number" min="942000" step="1" value="950000"></label>
   <label>Maximum scan blocks<input id="blocks" type="number" min="1" max="16" step="1" value="2"></label>
+  <label>Optional staging SDK inscription ID<input id="stagedSdk" type="text" placeholder="64-character hex + i0" autocomplete="off" spellcheck="false"></label>
  </div>
- <p><small>These are test inputs, not claims that either Bitmap is registered. The scanner is capped at 16 blocks per button press. A missing, incomplete lookup is not proof that a Bitmap is unclaimed.</small></p>
+ <p><small>These are test inputs, not claims that either Bitmap is registered. Leave staging ID blank to load the canonical SDK sat; reload the page before switching SDK versions. The scanner is capped at 16 blocks per button press. A missing, incomplete lookup is not proof that a Bitmap is unclaimed.</small></p>
  <button id="run">Run read-only checks</button>
  <button id="index" class="secondary">Run v1.0.3 two-block cache benchmark</button>
  <button id="reuse" class="secondary">Recheck saved blocks (after reload)</button>
@@ -143,12 +144,16 @@ async function setup() {
   if (sdk) return sdk;
   const started = performance.now();
   const loaded = await check("SDK recursive import", async () => {
-    const mod = await import(SDK_URL);
+    const entered=el("stagedSdk").value.trim();
+    if(entered && !/^[0-9a-f]{64}i[0-9]+$/i.test(entered)) throw Error("Staging SDK ID is not a valid inscription ID");
+    const importPath=entered?"/content/"+entered:SDK_URL;
+    report.sdkImport=importPath;
+    const mod = await import(importPath);
     sdk = mod.default || mod.BitmapSDK;
     if (!sdk || typeof sdk.scanBitmapClaim !== "function") throw Error("SDK missing scanBitmapClaim()");
     report.sdkVersion = sdk.VERSION || "unknown";
     el("version").firstChild.textContent = report.sdkVersion;
-    return pass("Imported actual on-chain SDK from " + SDK_URL, { sdkVersion:report.sdkVersion });
+    return pass("Imported actual on-chain SDK from " + importPath, { sdkVersion:report.sdkVersion });
   });
   if (!loaded) return null;
   const tipResult = await check("Ord recursive tip and hash", async () => {
