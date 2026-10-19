@@ -579,8 +579,10 @@ export async function indexBitmapBlocks({
     let first = startHeight;
     if (resuming) {
         const cursor = persist && indexedDbAvailable() ? await getMetaValue("bitmapIndex:lastScannedHeight") : null;
+        // Leave room for forward progress even when maxBlocks is 1.
+        const overlap = Math.min(12, maxBlocks - 1);
         first = Number.isSafeInteger(cursor) && cursor >= OLD_OCI_LIMIT
-            ? Math.max(OLD_OCI_LIMIT, cursor - 11) : OLD_OCI_LIMIT;
+            ? Math.max(OLD_OCI_LIMIT, cursor + 1 - overlap) : OLD_OCI_LIMIT;
     }
     const last = Math.min(confirmedHeight, endHeight === null ? confirmedHeight : endHeight, first + maxBlocks - 1);
     let processedBlocks = 0, fetchedBlocks = 0, reusedBlocks = 0, bitmapCandidates = 0;
