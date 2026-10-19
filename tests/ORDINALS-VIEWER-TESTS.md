@@ -116,6 +116,66 @@ v1.0.3 works on a live Ord viewer. Run the probes directly in that
 environment and share their resulting JSON before publishing or
 reinscribing the SDK.
 
+
+## C. Profile first-load Mondrian geometry (840000.bitmap)
+
+The live baseline measured from an Ordinals viewer for \`840000.bitmap\` was:
+- initial geometry: **1,803.9 ms** with \`recursive-raw-block\`;
+- warm local geometry: **4.1 ms**, 3,050 parcel slots;
+- a forced rebuild including gaps: **32.3 ms**, 48 empty spaces.
+
+Those numbers are browser observations, not separate parser/network timing
+measurements. The raw block fallback (and its network/cache behaviour) is a
+plausible major cost, but cannot be identified as the dominant component
+without profiling.
+
+[ordinals-mondrian-profiler-console.js](./ordinals-mondrian-profiler-console.js)
+runs in the **same Ordinals inscription DevTools console** as test A.
+Copy all of it and paste into the inscription document context.
+
+The script intentionally calls \`getBitmapMondrian(840000)\` with
+\`forceRefresh:true, forceLive:true, includeEmptySpaces:true\` so the
+current v1.0.2 does not silently return an old cached layout. It then
+runs a warm lookup and reports the number of slots and empty spaces,
+\`/r/block/\` requests, HTTP and JSON decode timings, and overall
+elapsed time. It restores \`window.fetch\` afterwards.
+
+v1.0.3 adds the optional \`onTiming\` callback, which reports:
+- \`mondrian-module\`
+- \`raw-block-http\`
+- \`raw-block-json\`
+- \`raw-block-transaction-parser\`
+- \`block-transaction-count\`
+- \`pattern-derivation\`
+- \`pattern-resolution\` (inclusive of nested stages)
+- \`layout-construction\`
+- \`slot-mapping\`
+- \`empty-space-construction\`
+- \`indexeddb-persist\` (when available and requested)
+- \`total\` (inclusive elapsed time)
+
+Nested stages and independently awaited requests can overlap, so **do not
+sum the stage durations to calculate total runtime**.
+
+Until v1.0.3 is actually published to an accessible Ord inscription, the
+current canonical v1.0.2 still yields endpoint measurements but no internal
+\`onTiming\` records. For a deliberately inscribed staging version, enter
+its real inscription ID in the script's \`STAGING_INSCRIPTION_ID\` constant.
+Never use GitHub-hosted code as an Ord recursive import substitute.
+
+### Optimisations already applied to the v1.0.3 development branch
+
+- \`/r/block/<height>\` and \`/r/blockinfo/<height>\` are fetched in
+  parallel on the raw Mondrian fallback. Previously the code fetched
+  the block, parsed it and **then** fetched transaction count.
+- The geometry loader reuses an IndexedDB record already read in the same
+  call when expanding base geometry into empty spaces.
+- Geometry now has opt-in per-stage profiling without a default network or
+  feature dependency.
+
+No real-world speedup is asserted until the on-chain staging version
+has been profiled against the current canonical version.
+
 ## Relevant source
 
 - [Ordinal Theory Handbook: recursion](https://docs.ordinals.com/inscriptions/recursion.html)
