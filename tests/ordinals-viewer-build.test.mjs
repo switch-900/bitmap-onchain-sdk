@@ -10,6 +10,7 @@ const consoleJs = await readFile(consoleFile, "utf8");
 const profilerJs = await readFile(new URL("./ordinals-mondrian-profiler-console.js", import.meta.url), "utf8");
 const hexJs = await readFile(new URL("./ordinals-hex-benchmark-console.js", import.meta.url), "utf8");
 const packJs = await readFile(new URL("./ordinals-pattern-packing-console.js", import.meta.url), "utf8");
+const manifestJs = await readFile(new URL("./ordinals-pattern-manifest-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -75,4 +76,23 @@ test("840000 compact Mondrian pattern probe has valid syntax, local recursion an
   assert.deepEqual(api.decode(encoded,sizes.length),sizes);
   assert.throws(()=>api.encode([0]),/Invalid Mondrian/);
   assert.throws(()=>api.decode(Uint8Array.of(0),2),/Invalid Mondrian/);
+});
+
+test("840000 compact pattern manifest export is read-only and roundtrips 3050 slots", () => {
+  assert.doesNotThrow(() => new Script(manifestJs, {filename:"ordinals-pattern-manifest-console.js"}));
+  assert.match(manifestJs, /getBitmapPattern\(HEIGHT, \{forceLive:true\}\)/);
+  assert.match(manifestJs, /crypto\.subtle\.digest\("SHA-256", bytes\)/);
+  assert.match(manifestJs, /DecompressionStream/);
+  assert.match(manifestJs, /roundtripEqual: true/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(manifestJs),false);
+  const begin=manifestJs.indexOf("function nibble(");
+  const end=manifestJs.indexOf("const hex = ",begin);
+  assert.ok(begin>0 && end>begin);
+  const {pack,unpack} = new Function(manifestJs.slice(begin,end)+"\nreturn {pack,unpack};")();
+  const values=Array.from({length:3050},(_,i)=>1+(i%9));
+  const encoded=pack(values);
+  assert.equal(encoded.length,1525);
+  assert.deepEqual(unpack(encoded,values.length),values);
+  assert.throws(()=>pack([0]),/Out-of-range Mondrian/);
+  assert.throws(()=>unpack(Uint8Array.from([0x11,0x12]),3),/Invalid nonzero trailing nibble/);
 });
