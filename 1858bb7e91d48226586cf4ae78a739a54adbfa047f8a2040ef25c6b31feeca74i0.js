@@ -921,22 +921,84 @@ function parseRawBlockOutputTotals(e, t) { const a = rawBlockHexToBytes(e, t), r
     skipRawBytes(a, r, 4, "transaction locktime"), i[e] = s;
 } if (r.offset !== a.length)
     throw new Error("Raw block parser ended at byte " + r.offset + " of " + a.length + " for block " + t); return i; }
-async function fetchRecursiveBlockOutputTotals(e) { checkBitmapNumber(e); const t = await fetchWithTimeout("/r/block/" + e); if (!t.ok)
-    throw new Error("/r/block/" + e + " returned HTTP " + t.status); const a = await t.json(); return parseRawBlockOutputTotals(a, e); }
-async function fetchLiveMondrianPattern(e, t) { if ("function" != typeof t?.getSquareSize)
-    throw new Error("Mondrian module does not export getSquareSize()"); const a = await fetchRecursiveBlockOutputTotals(e), r = await getBlockTransactionCount(e); if (a.length !== r)
-    throw new Error("Mondrian transaction count mismatch for block " + e + ": raw-block=" + a.length + ", blockinfo=" + r); const n = validateMondrianPattern(a.map(e => t.getSquareSize(e)), e); return { pattern: n, values: a, source: "recursive-raw-block" }; }
-async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a = !0 } = {}) { checkBitmapNumber(e); const r = await storageGetMondrianSafe(e); if (!t && Array.isArray(r?.pattern) && r.pattern.length > 0)
-    return { pattern: validateMondrianPattern(r.pattern, e), source: r.patternSource ?? r.source ?? "indexeddb", cacheSource: "indexeddb", mondrianModule: await loadMondrianModule() }; const n = await loadMondrianModule(); if (!t && "function" == typeof n?.getPatternArray) {
-    const t = validateMondrianPattern(n.getPatternArray(e), e);
-    if (t) {
-        const a = await getBlockTransactionCount(e);
-        if (t.length !== a)
-            throw new Error("Indexed Mondrian transaction count mismatch for block " + e + ": pattern=" + t.length + ", blockinfo=" + a);
-        return { pattern: t, source: "on-chain-pattern-index", mondrianModule: n };
+// Optional timing callbacks record real browser stages without adding requests.
+function mondrianNow() {
+    return "undefined" != typeof performance && "function" == typeof performance.now ? performance.now() : Date.now();
+}
+function reportMondrianStage(onTiming, stage, started, detail = {}) {
+    if ("function" != typeof onTiming) return;
+    try {
+        onTiming({ stage, ms: Math.round((mondrianNow() - started) * 100) / 100, ...detail });
+    } catch {
+        // Observability must never change canonical geometry behaviour.
     }
-} if (!a)
-    throw new Error("No indexed Mondrian pattern is available for block " + e); return { ...await fetchLiveMondrianPattern(e, n), mondrianModule: n }; }
+}
+async function fetchRecursiveBlockOutputTotals(height, onTiming = null) {
+    checkBitmapNumber(height);
+    let started = mondrianNow();
+    const response = await fetchWithTimeout("/r/block/" + height);
+    reportMondrianStage(onTiming, "raw-block-http", started, { height });
+    if (!response.ok)
+        throw new Error("/r/block/" + height + " returned HTTP " + response.status);
+    started = mondrianNow();
+    const hex = await response.json();
+    reportMondrianStage(onTiming, "raw-block-json", started, { height, hexChars: "string" == typeof hex ? hex.length : null });
+    started = mondrianNow();
+    const totals = parseRawBlockOutputTotals(hex, height);
+    reportMondrianStage(onTiming, "raw-block-transaction-parser", started, { height, transactions: totals.length });
+    return totals;
+}
+async function fetchLiveMondrianPattern(height, mondrian, onTiming = null) {
+    if ("function" != typeof mondrian?.getSquareSize)
+        throw new Error("Mondrian module does not export getSquareSize()");
+    // Block info is independent of the raw block, so fetch concurrently.
+    const totalsPromise = fetchRecursiveBlockOutputTotals(height, onTiming);
+    const blockInfoPromise = (async () => {
+        const started = mondrianNow();
+        const count = await getBlockTransactionCount(height);
+        reportMondrianStage(onTiming, "block-transaction-count", started, { height, transactions: count });
+        return count;
+    })();
+    const [totals, txCount] = await Promise.all([totalsPromise, blockInfoPromise]);
+    if (totals.length !== txCount)
+        throw new Error("Mondrian transaction count mismatch for block " + height + ": raw-block=" + totals.length + ", blockinfo=" + txCount);
+    const started = mondrianNow();
+    const pattern = validateMondrianPattern(totals.map(total => mondrian.getSquareSize(total)), height);
+    reportMondrianStage(onTiming, "pattern-derivation", started, { height, transactions: totals.length });
+    return { pattern, values: totals, source: "recursive-raw-block" };
+}
+async function resolveBitmapPattern(height, {
+    forceLive = false, allowLiveFallback = true, onTiming = null, cachedRecord = undefined
+} = {}) {
+    checkBitmapNumber(height);
+    // Reuse the IndexedDB record the geometry caller already read.
+    const record = forceLive ? null :
+        cachedRecord === undefined ? await storageGetMondrianSafe(height) : cachedRecord;
+    if (!forceLive && Array.isArray(record?.pattern) && record.pattern.length > 0)
+        return {
+            pattern: validateMondrianPattern(record.pattern, height),
+            source: record.patternSource ?? record.source ?? "indexeddb",
+            cacheSource: "indexeddb",
+            mondrianModule: await loadMondrianModule()
+        };
+    const moduleStarted = mondrianNow();
+    const mondrian = await loadMondrianModule();
+    reportMondrianStage(onTiming, "mondrian-module", moduleStarted, { height });
+    if (!forceLive && "function" == typeof mondrian?.getPatternArray) {
+        const indexedPattern = validateMondrianPattern(mondrian.getPatternArray(height), height);
+        if (indexedPattern) {
+            const indexedCountStarted = mondrianNow();
+            const count = await getBlockTransactionCount(height);
+            reportMondrianStage(onTiming, "block-transaction-count", indexedCountStarted, { height, transactions: count });
+            if (indexedPattern.length !== count)
+                throw new Error("Indexed Mondrian transaction count mismatch for block " + height + ": pattern=" + indexedPattern.length + ", blockinfo=" + count);
+            return { pattern: indexedPattern, source: "on-chain-pattern-index", mondrianModule: mondrian };
+        }
+    }
+    if (!allowLiveFallback)
+        throw new Error("No indexed Mondrian pattern is available for block " + height);
+    return { ...await fetchLiveMondrianPattern(height, mondrian, onTiming), mondrianModule: mondrian };
+}
 export async function getBitmapPattern(e, t = {}) { return (await resolveBitmapPattern(e, t)).pattern.slice(); }
 export async function getBitmapPatternInfo(e, t = {}) { const { pattern: a, source: r, cacheSource: n = null } = await resolveBitmapPattern(e, t); return { bitmapNumber: e, pattern: a.slice(), source: r, indexed: "on-chain-pattern-index" === r, cached: "indexeddb" === n }; }
 export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v && !n) {
