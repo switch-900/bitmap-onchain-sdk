@@ -453,6 +453,24 @@ catch {
 
 /* Shared local block coverage; empty blocks matter too. All winners are still
  * selected by scanning ascending block height and validating the raw claim. */
+let bitmapIndexRewindHeight = null, bitmapIndexRollbackPromise = null;
+async function rewindStaleBitmapIndex(height) {
+    if (!indexedDbAvailable()) return void clearCaches();
+    bitmapIndexRewindHeight = bitmapIndexRewindHeight === null ? height : Math.min(bitmapIndexRewindHeight, height);
+    if (!bitmapIndexRollbackPromise) {
+        bitmapIndexRollbackPromise = (async () => {
+            while (bitmapIndexRewindHeight !== null) {
+                const start = bitmapIndexRewindHeight;
+                bitmapIndexRewindHeight = null;
+                if (!await rollbackStorageFromHeight(start)) {
+                    clearCaches();
+                    throw new Error("Unable to roll back stale Bitmap index at block " + start);
+                }
+            }
+        })().finally(() => { bitmapIndexRollbackPromise = null; });
+    }
+    await bitmapIndexRollbackPromise;
+}
 function bitmapClaimsFromParsedBlock(height, inscriptions) {
     const claims = [];
     for (let ordinal = 0; ordinal < inscriptions.length; ordinal++) {
@@ -491,6 +509,9 @@ async function getIndexedBitmapBlockClaims(height, { forceRefresh = false, persi
                 rememberBitmapBlockClaim(record);
                 return { height, hash: currentHash, claims: record.claims, cached: true };
             }
+            // A changed block hash can invalidate saved winners and per-Bitmap
+            // watermarks, not only this block's candidate list.
+            await rewindStaleBitmapIndex(height);
         }
         // Parser memory caches cannot survive a height's hash changing.
         bitmapBlockClaimCache.delete(height);
@@ -516,6 +537,21 @@ async function getIndexedBitmapBlockClaims(height, { forceRefresh = false, persi
     const pending = work().finally(() => bitmapBlockClaimPromiseCache.delete(height));
     bitmapBlockClaimPromiseCache.set(height, pending);
     return await pending;
+}
+async function persistParsedBitmapBlock(height, hash, inscriptions) {
+    const stillCurrent = await getBlockHashWithRetry(height);
+    if (stillCurrent !== hash)
+        throw new Error("Reorganisation while recording watched block " + height);
+    const record = {
+        height, hash, claims: bitmapClaimsFromParsedBlock(height, inscriptions),
+        protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now()
+    };
+    if (indexedDbAvailable()) {
+        await initialiseStorage();
+        if (!await idbPut("bitmapBlockIndex", record))
+            throw new Error("Unable to save watched Bitmap block " + height);
+    }
+    rememberBitmapBlockClaim(record);
 }
 async function getBitmapBlockClaimsBatch(first, last, { concurrency = 8, persist = true, forceRefresh = false } = {}) {
     const heights = Array.from({ length: last - first + 1 }, (_, i) => first + i);
@@ -1023,7 +1059,7 @@ catch {
     return !1;
 } }
 async function persistProcessedBlock(e, t, a) { await idbPut("blockHashes", { height: e, hash: t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), await Promise.all([setMetaValue("watch:lastProcessedHeight", e), setMetaValue("watch:lastProcessedHash", t), setMetaValue("watch:coverageStartHeight", a)]); }
-async function scanBlockInternal(e, { validate: t = !0, includeNonCanonical: a = !1, validationConcurrency: r = 4, persist: n = !0, continuous: i = !1, coverageStartHeight: o = null, resolveEncodedParcelCandidates: v = !1 } = {}) { checkBitmapNumber(e); const [s, c] = await Promise.all([getBlockHashWithRetry(e), getParsedBlockInscriptionsWithRetry(e)]), l = [], u = [], k = []; await mapWithConcurrency(c, r, async (t) => { const a = strictClaimText(t), r = parseBitmapName(a); if (r)
+async function scanBlockInternal(e, { validate: t = !0, includeNonCanonical: a = !1, validationConcurrency: r = 4, persist: n = !0, continuous: i = !1, coverageStartHeight: o = null, resolveEncodedParcelCandidates: v = !1 } = {}) { checkBitmapNumber(e); const [s, c] = await Promise.all([getBlockHashWithRetry(e), getParsedBlockInscriptionsWithRetry(e)]), l = [], u = [], k = []; if (n) await persistParsedBitmapBlock(e, s, c); await mapWithConcurrency(c, r, async (t) => { const a = strictClaimText(t), r = parseBitmapName(a); if (r)
     return void l.push({ id: t.id, height: e, content: a, bitmapNumber: r.bitmapNumber, eligibleHeight: r.bitmapNumber <= e }); let n = parseParcelName(a); if (!n && (hasContentEncoding(t) || hasDelegate(t))) {
     if (!v)
         return void k.push({ id: t.id, height: e });
