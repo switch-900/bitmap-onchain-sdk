@@ -33,7 +33,10 @@ this runs the **earlier on-chain SDK**, not the new GitHub v1.0.3 branch.
 It will report the version it loaded, and skip new indexer benchmarks when
 \`indexBitmapBlocks()\` is absent. This is intentional, not a simulated result.
 A GitHub URL cannot simply be imported inside an Ord inscription due to the
-viewer content-security policy.
+viewer content-security policy. If a **separate staging SDK inscription** later
+exists, change the `SDK` constant at the beginning of the console script to
+`"/content/<STAGING_SDK_INSCRIPTION_ID>"` before pasting. That tests the
+specific on-chain staging bytes without replacing the canonical SDK.
 
 ## B. Self-contained HTML test inscription
 
@@ -46,7 +49,9 @@ inscribed SDK through:
 await import("/r/sat/25483050779204/at/-1/content");
 \`\`\`
 
-and fetches same-origin Ord recursive data. It has no npm imports, CDNs,
+by default, or imports `/content/<STAGING_SDK_INSCRIPTION_ID>` if you enter a
+valid on-chain staging ID in the optional input. It fetches same-origin Ord
+recursive data. It has no npm imports, CDNs,
 external stylesheets or wallet libraries.
 
 **This HTML has not been inscribed.** A Github raw HTML file does not become
@@ -57,7 +62,7 @@ a later deliberate test inscription.
 
 Buttons:
 
-- **Run read-only checks**: loads the latest SDK on its canonical sat,
+- **Run read-only checks**: loads the canonical sat SDK or the explicitly chosen staging SDK,
   checks \`/r/blockheight\` and \`/r/blockhash/\`, checks strict Bitmap-name
   parsing, and uses \`scanBitmapClaim()\` with **no more than 16 blocks**
   for each requested historical/modern Bitmap. If a claim is found,
