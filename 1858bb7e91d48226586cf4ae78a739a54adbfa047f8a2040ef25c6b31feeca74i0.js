@@ -852,9 +852,36 @@ function patternFromTransactions(e, t, a) { if (!Array.isArray(e))
     if (i += a, !Number.isSafeInteger(i))
         throw new Error("Transaction " + r + " in block " + t + " exceeds safe-integer range");
 } return a.getSquareSize(i); }), t); }
-function rawBlockHexToBytes(e, t) { if ("string" != typeof e || e.length < 162 || e.length % 2 != 0 || !/^[0-9a-f]+$/i.test(e))
-    throw new Error("/r/block/" + t + " returned invalid block hex"); const a = new Uint8Array(e.length / 2); for (let t = 0; t < a.length; t++)
-    a[t] = Number.parseInt(e.slice(2 * t, 2 * t + 2), 16); return a; }
+function rawBlockHexNibble(code) {
+    if (code >= 48 && code <= 57) return code - 48;
+    if (code >= 65 && code <= 70) return code - 55;
+    if (code >= 97 && code <= 102) return code - 87;
+    return -1;
+}
+function rawBlockHexToBytes(hex, height) {
+    const invalid = () => new Error("/r/block/" + height + " returned invalid block hex");
+    if ("string" != typeof hex || hex.length < 162 || 0 !== hex.length % 2)
+        throw invalid();
+    // ES2025 native conversion is dramatically faster than millions of
+    // parseInt/substr allocations. The fallback retains support for older
+    // browsers and validates every byte just as strictly.
+    if ("function" == typeof Uint8Array.fromHex) {
+        try {
+            return Uint8Array.fromHex(hex);
+        } catch {
+            throw invalid();
+        }
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0, offset = 0; i < bytes.length; i++, offset += 2) {
+        const hi = rawBlockHexNibble(hex.charCodeAt(offset));
+        const lo = rawBlockHexNibble(hex.charCodeAt(offset + 1));
+        if (hi < 0 || lo < 0)
+            throw invalid();
+        bytes[i] = hi * 16 + lo;
+    }
+    return bytes;
+}
 function readCompactSize(e, t, a) { if (t.offset >= e.length)
     throw new Error("Truncated " + a); const r = e[t.offset++]; if (r < 253)
     return r; let n = 0; if (253 === r) {
