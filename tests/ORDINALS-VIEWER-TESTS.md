@@ -185,3 +185,21 @@ has been profiled against the current canonical version.
 ### Raw block hexadecimal conversion
 
 The development SDK uses native `Uint8Array.fromHex()` on supporting browsers and a strict validated fallback elsewhere. This removes the older per-byte `parseInt(hex.slice())` loop on modern browsers. A 6-million-character synthetic V8 benchmark showed conversion much faster, but that **does not measure total Bitmap load time**: HTTP transfer and JSON body reading are separate bottlenecks. Compare the detailed `raw-block-hex-decoder` timing in a real staged viewer before attributing an end-to-end speedup.
+
+## D. Compare raw block hex decoder on actual 840000.bitmap
+
+Open an Ordinals HTML inscription viewer, select the inscription document's
+DevTools Console and paste the entire file
+[ordinals-hex-benchmark-console.js](./ordinals-hex-benchmark-console.js).
+It fetches `/r/block/840000` **once** and compares byte-for-byte:
+
+- v1.0.2's `parseInt(hex.slice())` decoder;
+- v1.0.3's manually validated older-browser decoder;
+- the browser's native `Uint8Array.fromHex()` when supported.
+
+It shows actual `response.json()` time separately from hex conversion time.
+It rejects mismatches. The console object is saved to
+`window.__bitmapHex840000Report`, and
+`copy(JSON.stringify(window.__bitmapHex840000Report,null,2))`
+copies its report. **This does not test the complete v1.0.3 Mondrian path**;
+it isolates the new conversion optimisation on real block bytes.
