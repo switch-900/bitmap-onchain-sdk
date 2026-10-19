@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmap SDK · Ordinals Recursive Test Bench</title>
+<style>
+:root{color-scheme:dark;font:15px/1.5 system-ui,sans-serif;background:#0b111a;color:#e8effa}
+*{box-sizing:border-box}body{max-width:1000px;margin:0 auto;padding:20px}
+h1{font-size:clamp(22px,4vw,31px);margin:0}h2{font-size:18px}
+p,.muted,small{color:#a9b9ce}a{color:#8dc7ff}
+.panel{background:#141e2b;border:1px solid #30425b;border-radius:12px;padding:17px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{display:block;font-weight:600;font-size:13px}
+input{width:100%;margin-top:6px;border:1px solid #405674;color:white;background:#0b111a;border-radius:8px;padding:10px;font:inherit}
+button{background:#266bc1;color:white;padding:11px 16px;border:0;border-radius:8px;font-weight:600;cursor:pointer;margin:5px 7px 5px 0}
+button.secondary{background:#293d58}button:disabled{opacity:.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th,td{padding:10px 8px;border-bottom:1px solid #2b3e55;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+th:first-child{width:26%}th:nth-child(2){width:12%}th:nth-child(3){width:12%}
+.pass{color:#6edca8;font-weight:700}.fail{color:#ff8888;font-weight:700}
+.skip{color:#e6c880;font-weight:700}.info{color:#98bee9;font-weight:700}
+#log{font-size:12px;overflow-wrap:anywhere;white-space:pre-wrap}
+textarea{width:100%;min-height:175px;font:12px/1.4 ui-monospace,monospace;color:#d8e8ff;background:#08111d;border:1px solid #39506e;border-radius:8px;padding:10px}
+.kpi{font-size:20px;font-weight:700}.kpi small{display:block;font-size:12px;font-weight:400}
+@media(max-width:520px){body{padding:10px}th,td{padding:8px 4px;font-size:11px}}
+</style>
+</head>
+<body>
+<h1>Bitmap SDK · Ordinals test bench</h1>
+<p>Read-only tests using actual <code>/r/</code> recursive endpoints. No wallet, signing, transactions or off-chain APIs. Designed for <code>/content/&lt;id&gt;</code> or <code>/preview/&lt;id&gt;</code> on an Ord server.</p>
+
+<section class="panel">
+ <div class="grid">
+  <label>Historical Bitmap (optional known claim)<input id="historical" type="number" min="0" step="1" value="177700"></label>
+  <label>Modern Bitmap (bounded discovery)<input id="modern" type="number" min="942000" step="1" value="950000"></label>
+  <label>Maximum scan blocks<input id="blocks" type="number" min="1" max="16" step="1" value="2"></label>
+ </div>
+ <p><small>These are test inputs, not claims that either Bitmap is registered. The scanner is capped at 16 blocks per button press. A missing, incomplete lookup is not proof that a Bitmap is unclaimed.</small></p>
+ <button id="run">Run read-only checks</button>
+ <button id="index" class="secondary">Run v1.0.3 two-block cache benchmark</button>
+ <button id="copy" class="secondary">Copy JSON report</button>
+ <div id="status" aria-live="polite" class="muted">Ready. No network requests have been made.</div>
+</section>
+
+<section class="grid">
+ <div class="panel kpi" id="version">—<small>SDK version</small></div>
+ <div class="panel kpi" id="tip">—<small>Bitcoin block tip</small></div>
+ <div class="panel kpi" id="requests">0<small>Instrumented fetch requests (module imports excluded)</small></div>
+ <div class="panel kpi" id="bytes">—<small>Raw block payload bytes (fetch API only)</small></div>
+</section>
+
+<section class="panel"><h2>Executed results</h2>
+ <table><thead><tr><th>Check</th><th>Result</th><th>Elapsed</th><th>Evidence / reason</th></tr></thead><tbody id="results"></tbody></table>
+</section>
+<section class="panel"><h2>JSON evidence</h2>
+ <p><small>Records actual values when obtained; null means unavailable. Capture this to compare two versions on the same Ord server. Times and request counts are browser observations, not a blockchain-wide benchmark.</small></p>
+ <textarea id="report" spellcheck="false" readonly></textarea>
+</section>
+<script type="module">
+"use strict";
+const SDK_URL = "/r/sat/25483050779204/at/-1/content";
+const el = id => document.getElementById(id);
+let sdk = null, tipHeight = null, running = false;
+const started = new Date().toISOString();
+const report = {
+  probeVersion: "1.0.0",
+  origin: location.origin,
+  pagePath: location.pathname,
+  ranAt: started,
+  sdkImport: SDK_URL,
+  sdkVersion: null,
+  tipHeight: null,
+  inputs: {},
+  tests: [],
+  fetchMetrics: { total:0, rawBlocks:0, blockHashes:0, inscriptionInfo:0, other:0, rawBlockBytes:0 },
+  notes: ["Only fetch() calls are instrumented; ES module imports and browser HTTP cache are not measured."]
+};
+const originalFetch = globalThis.fetch.bind(globalThis);
+function pathOf(input) {
+  try { return new URL(typeof input === "string" ? input : input.url, location.href).pathname; }
+  catch { return String(input); }
+}
+globalThis.fetch = async function(input, init) {
+  const path = pathOf(input);
+  report.fetchMetrics.total++;
+  if (/^\/r\/block\/[0-9a-f]+$/i.test(path)) report.fetchMetrics.rawBlocks++;
+  else if (path.startsWith("/r/blockhash/")) report.fetchMetrics.blockHashes++;
+  else if (path.startsWith("/r/inscription/")) report.fetchMetrics.inscriptionInfo++;
+  else report.fetchMetrics.other++;
+  const response = await originalFetch(input, init);
+  if (/^\/r\/block\/[0-9a-f]+$/i.test(path) && response.ok) {
+    const len = response.headers.get("content-length");
+    // Ord usually returns JSON hex: count payload only when known.
+    if (len && Number.isFinite(Number(len))) report.fetchMetrics.rawBlockBytes += Number(len);
+  }
+  refresh();
+  return response;
+};
+function refresh() {
+  el("requests").firstChild.textContent = String(report.fetchMetrics.total);
+  el("bytes").firstChild.textContent = report.fetchMetrics.rawBlockBytes ?
+    report.fetchMetrics.rawBlockBytes.toLocaleString() : "Not reported";
+  el("report").value = JSON.stringify(report, null, 2);
+}
+function result(name, status, millis, evidence, details = {}) {
+  const row = { name, status, elapsedMs: Math.round(millis * 10) / 10, evidence, ...details };
+  report.tests.push(row);
+  const tr = document.createElement("tr");
+  for (const value of [name, status, row.elapsedMs + " ms", evidence]) {
+    const td = document.createElement("td");
+    td.textContent = String(value);
+    if (value === status) td.className = status.toLowerCase();
+    tr.append(td);
+  }
+  el("results").append(tr);
+  refresh();
+}
+async function check(name, fn) {
+  const start = performance.now();
+  try {
+    const x = await fn();
+    result(name, x.status || "PASS", performance.now()-start, x.evidence || "", x.details || {});
+    return x;
+  } catch (err) {
+    result(name, "FAIL", performance.now()-start, String(err?.message || err));
+    return null;
+  }
+}
+const pass = (evidence, details = {}) => ({ status:"PASS", evidence, details });
+const skip = evidence => ({ status:"SKIP", evidence });
+function integer(id, fallback, low, high) {
+  const n = Number(el(id).value);
+  return Number.isSafeInteger(n) && n >= low && n <= high ? n : fallback;
+}
+function diff(before) {
+  const now = report.fetchMetrics;
+  return Object.fromEntries(Object.keys(now).map(k => [k,now[k]-before[k]]));
+}
+function snapshot(){ return { ...report.fetchMetrics }; }
+async function setup() {
+  if (sdk) return sdk;
+  const started = performance.now();
+  const loaded = await check("SDK recursive import", async () => {
+    const mod = await import(SDK_URL);
+    sdk = mod.default || mod.BitmapSDK;
+    if (!sdk || typeof sdk.scanBitmapClaim !== "function") throw Error("SDK missing scanBitmapClaim()");
+    report.sdkVersion = sdk.VERSION || "unknown";
+    el("version").firstChild.textContent = report.sdkVersion;
+    return pass("Imported actual on-chain SDK from " + SDK_URL, { sdkVersion:report.sdkVersion });
+  });
+  if (!loaded) return null;
+  const tipResult = await check("Ord recursive tip and hash", async () => {
+    const r = await globalThis.fetch("/r/blockheight");
+    if (!r.ok) throw Error("/r/blockheight HTTP "+r.status);
+    tipHeight = Number(await r.text());
+    if (!Number.isSafeInteger(tipHeight) || tipHeight < 0) throw Error("Invalid Bitcoin height");
+    const h = await globalThis.fetch("/r/blockhash/" + tipHeight);
+    if (!h.ok) throw Error("/r/blockhash HTTP " + h.status);
+    const hash = await h.json();
+    if (typeof hash !== "string" || !/^[0-9a-f]{64}$/i.test(hash)) throw Error("Invalid block hash");
+    el("tip").firstChild.textContent = String(tipHeight);
+    report.tipHeight = tipHeight;
+    return pass("Tip "+tipHeight+", hash "+hash,{height:tipHeight,hash});
+  });
+  if (!tipResult) return null;
+  return sdk;
+}
+async function verifyFound(bitmapNumber, scan) {
+  const id = scan.inscriptionId;
+  if (!/^[0-9a-f]{64}i[0-9]+$/i.test(id||"")) throw Error("Found result has invalid inscription ID");
+  const response = await fetch("/r/inscription/" + id);
+  if (!response.ok) throw Error("Inscription lookup HTTP "+response.status);
+  const info = await response.json();
+  const genesis = Number(info.height ?? info.genesis_height);
+  if (!Number.isSafeInteger(genesis) || genesis < bitmapNumber) throw Error("Inscription genesis height is invalid/too early");
+  if (Number.isSafeInteger(scan.height) && scan.height !== genesis) throw Error("SDK height differs from recursive record");
+  return { id, height:genesis, sat:info.sat ?? null, number:info.number ?? null };
+}
+async function inspectBitmap(name, n) {
+  if (n > tipHeight) {
+    result(name,"SKIP",0,"Bitmap height "+n+" is above chain tip "+tipHeight);
+    return;
+  }
+  const maxScanBlocks = report.inputs.maxScanBlocks;
+  const b = snapshot(), start = performance.now();
+  const found = await check(name, async () => {
+    const scan = await sdk.scanBitmapClaim(n, { maxScanBlocks, persist:true });
+    if (!scan || !["found","missing","future"].includes(scan.state)) throw Error("Unexpected bounded scan state");
+    if (scan.state === "found") {
+      const independent = await verifyFound(n, scan);
+      const val = await sdk.validateBitmap(n);
+      if (!val.valid || val.inscriptionId !== independent.id) throw Error("Canonical validation does not agree with bounded discovery");
+      const sid = await sdk.getBitmapInscriptionId(n);
+      if (sid !== independent.id) throw Error("Inscription ID getter mismatch");
+      const sat = await sdk.getBitmapSat(n);
+      if (independent.sat !== null && sat !== independent.sat) throw Error("Sat mismatch against /r/inscription");
+      return pass("FOUND "+independent.id+" | height "+independent.height+" | sat "+String(sat),{
+        state:scan.state,bitmapNumber:n,inscriptionId:independent.id,sat,inscriptionNumber:independent.number,
+        blockHeight:independent.height, scannedThroughHeight:scan.scannedThroughHeight
+      });
+    }
+    if (scan.state === "missing") {
+      const validCursor = Number.isSafeInteger(scan.scannedThroughHeight) &&
+        scan.scannedThroughHeight >= n &&
+        scan.scannedThroughHeight <= tipHeight;
+      if (!validCursor) throw Error("Bounded scanner returned invalid progress");
+      return { status:"INFO",evidence:"Not found in checked range; complete="+!!scan.complete+
+        " scannedThrough="+scan.scannedThroughHeight+
+        ". This is not proof of an unclaimed Bitmap.",
+        details:{state:scan.state,bitmapNumber:n,complete:scan.complete,scannedThroughHeight:scan.scannedThroughHeight,nextHeight:scan.nextHeight??null}};
+    }
+    return skip("Future bitmap number");
+  });
+  if (found) {
+    result(name+" / request costs","INFO",performance.now()-start,
+      JSON.stringify(diff(b)),{requests:diff(b),bitmapNumber:n});
+  }
+}
+async function runSafe() {
+  if (running) return;
+  running=true;el("run").disabled=true;el("index").disabled=true;
+  el("status").textContent="Executing bounded, read-only checks…";
+  el("results").textContent="";report.tests=[];report.ranAt=new Date().toISOString();
+  report.inputs = {
+    historicalBitmap:integer("historical",177700,0,Number.MAX_SAFE_INTEGER),
+    modernBitmap:integer("modern",950000,942000,Number.MAX_SAFE_INTEGER),
+    maxScanBlocks:integer("blocks",2,1,16)
+  };
+  try {
+    if (!await setup()) return;
+    await check("Strict Bitmap text parsing", async()=>{
+      const good=sdk.parseBitmapName("42.bitmap");
+      const bad=["042.bitmap","42.bitmap ","-1.bitmap","42.Bitmap","1.2.bitmap"];
+      if(good?.bitmapNumber!==42 || bad.some(s=>sdk.parseBitmapName(s)!==null))
+        throw Error("Strict raw Bitmap name parsing differs from expectations");
+      return pass("42.bitmap accepted; padded, spaced, negative, mixed-case and Parcel examples rejected");
+    });
+    await inspectBitmap("Historical Bitmap (bounded)",report.inputs.historicalBitmap);
+    await inspectBitmap("Modern Bitmap (bounded)",report.inputs.modernBitmap);
+    await check("Read-only API surface",async()=>{
+      const names=["scanBitmapClaim","getBitmapInscriptionId","getBitmapSat","validateBitmap",
+        "getBlockHash","getChainHeight","watchBlocks","clearCaches"];
+      const missing=names.filter(n=>typeof sdk[n]!=="function");
+      if(missing.length)throw Error("Missing functions: "+missing.join(", "));
+      return pass(names.length+" required functions available");
+    });
+  } finally {
+    running=false;el("run").disabled=false;el("index").disabled=false;
+    el("status").textContent="Checks completed. Copy the JSON evidence below.";
+    refresh();
+  }
+}
+async function runIndex() {
+  if(running) return;
+  running=true;el("run").disabled=true;el("index").disabled=true;
+  el("status").textContent="Indexing two confirmed Bitcoin blocks (may download full raw blocks)…";
+  try {
+    if (!await setup()) return;
+    if (typeof sdk.indexBitmapBlocks !== "function") {
+      result("v1.0.3 index benchmark","SKIP",0,
+        "Loaded SDK "+String(sdk.VERSION)+": indexBitmapBlocks() is not available. Publish candidate SDK on-chain before testing it here.");
+      return;
+    }
+    const startHeight = tipHeight-8;
+    if(startHeight<942000) {
+      result("v1.0.3 index benchmark","SKIP",0,"Not enough confirmed modern blocks on this chain");
+      return;
+    }
+    const opts={startHeight,endHeight:startHeight+1,maxBlocks:2,concurrency:2,confirmations:6,persist:true};
+    const before=snapshot(),t0=performance.now();
+    const a=await check("Cold two-block index",async()=>{
+      const out=await sdk.indexBitmapBlocks({...opts,forceRefresh:true});
+      if(out.processedBlocks!==2||out.fetchedBlocks!==2) throw Error("Expected two fetched blocks");
+      return pass("Parsed 2 blocks, found "+out.bitmapCandidates+" raw claims",{
+        output:out,requestDelta:diff(before),blockHeights:[startHeight,startHeight+1]
+      });
+    });
+    if(!a)return;
+    const warmBefore=snapshot();
+    await check("Warm two-block index",async()=>{
+      const out=await sdk.indexBitmapBlocks(opts);
+      const d=diff(warmBefore);
+      if(out.processedBlocks!==2||out.reusedBlocks!==2) throw Error("Index coverage not reused");
+      if(d.rawBlocks!==0) throw Error("Warm run fetched "+d.rawBlocks+" raw Bitcoin blocks");
+      return pass("2 cached block records reused; 0 raw block fetches; hash checks="+d.blockHashes,{
+        output:out,requestDelta:d,elapsedFromColdStartMs:Math.round(performance.now()-t0)
+      });
+    });
+    await check("IndexedDB status",async()=>{
+      if(!sdk.storage?.getStatus)return skip("SDK does not expose storage.getStatus()");
+      const s=await sdk.storage.getStatus();
+      if(s.available && (!Number.isSafeInteger(s.bitmapBlockIndex)||s.bitmapBlockIndex<2))
+        throw Error("Expected stored block coverage");
+      return s.available?pass("IndexedDB entries: "+s.bitmapBlockIndex,{storage:s}):
+        skip("IndexedDB unavailable in this inscription sandbox; memory-only caching works");
+    });
+  }catch(err){
+    result("v1.0.3 index benchmark","FAIL",0,String(err?.message||err));
+  }finally{
+    running=false;el("run").disabled=false;el("index").disabled=false;
+    el("status").textContent="Index experiment finished. Copy JSON for analysis.";
+    refresh();
+  }
+}
+el("run").addEventListener("click",runSafe);
+el("index").addEventListener("click",runIndex);
+el("copy").addEventListener("click",async()=>{
+  refresh();
+  try { await navigator.clipboard.writeText(el("report").value); el("status").textContent="JSON report copied."; }
+  catch {el("report").focus();el("report").select();el("status").textContent="Clipboard denied by iframe; JSON selected for manual copy.";}
+});
+refresh();
+</script>
+</body>
+</html>
