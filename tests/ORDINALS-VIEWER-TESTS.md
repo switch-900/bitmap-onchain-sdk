@@ -203,3 +203,28 @@ It rejects mismatches. The console object is saved to
 `copy(JSON.stringify(window.__bitmapHex840000Report,null,2))`
 copies its report. **This does not test the complete v1.0.3 Mondrian path**;
 it isolates the new conversion optimisation on real block bytes.
+
+## E. Lossless compact Mondrian pattern size test for block 840000
+
+Copy [ordinals-pattern-packing-console.js](./ordinals-pattern-packing-console.js)
+into the DevTools Console of an existing Ordinals HTML inscription.
+It uses only the on-chain SDK and Ord recursive endpoints.
+It calls `getBitmapPattern(840000, { forceLive: true })` and will therefore
+incur a real, **read-only** `/r/block/840000` download.
+
+It packs exact Mondrian size classes 1 through 9 into 4-bit nibbles,
+unpacks them independently, and compares every element. For 3,050 slots,
+four-bit packing is exactly **1,525 bytes** before block height, version,
+block hash, lookup metadata, index overhead and inscription costs.
+This is not a network latency or inscription fee estimate.
+
+Where supported, `CompressionStream('gzip')` measures gzip size. This
+does not measure Brotli or Bitcoin inscription transaction size.
+Results are stored in `window.__bitmapPattern840000Report`.
+
+The compact pattern is derived data: being on-chain and matching a
+transaction count or block hash does not independently prove that it
+matches every transaction's output value. A future pattern index requires
+an explicit provenance and verification/trust policy.
+
+No new inscription or production index entry is created by this probe.
