@@ -228,3 +228,32 @@ matches every transaction's output value. A future pattern index requires
 an explicit provenance and verification/trust policy.
 
 No new inscription or production index entry is created by this probe.
+
+## F. Candidate compact pattern manifest for review (840000)
+
+[ordinals-pattern-manifest-console.js](./ordinals-pattern-manifest-console.js)
+generates a **read-only candidate manifest** in an Ordinals HTML viewer.
+It uses the inscribed SDK to derive `840000` directly from
+`/r/block/840000`, checks the block hash before and after reading,
+packs the 3,050 size classes at four bits each, and calculates
+SHA-256 of the uncompressed packed bytes.
+
+If `CompressionStream` and `DecompressionStream` are available, the
+script additionally verifies a gzip roundtrip and embeds gzip bytes
+as Base64. Otherwise it embeds the nibble-packed bytes directly.
+The result is placed in
+`window.__bitmapPatternManifest840000`; use
+`copy(JSON.stringify(window.__bitmapPatternManifest840000,null,2))`
+to copy it. No inscription, deployment or wallet action occurs.
+
+The manifest includes the block height, observed Bitcoin block hash,
+transaction count, nibble packing order, packed byte count, SHA-256,
+encoding and the compressed/packed payload. It is **not a self-validating
+Bitcoin proof**. A consumer can verify payload integrity and compare it
+against a trusted known hash, but cannot prove all derived transaction
+output sums from just the block hash and packed pattern.
+
+Treat this manifest as a review artifact only. Do not wire it into
+canonical SDK lookups or spend inscription fees until the proposed
+pattern source, coverage model, reorg handling and authenticity
+requirements have been reviewed explicitly.
