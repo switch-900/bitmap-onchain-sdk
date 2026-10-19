@@ -111,7 +111,7 @@
     // necessarily a cold browser HTTP cache, but always executes the raw parser.
     const live = await measure("Force-live full geometry, incl. gaps",()=>
       sdk.getBitmapMondrian(BITMAP,{
-        forceLive:true,includeEmptySpaces:true,persist:true,
+        forceRefresh:true,forceLive:true,includeEmptySpaces:true,persist:true,
         onTiming:event=>timings.push(event)
       })
     );
