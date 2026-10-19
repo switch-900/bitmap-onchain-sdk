@@ -579,12 +579,20 @@ async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = nu
     if (t)
         return foundBitmapCache.set(e, t.parsed), t.parsed;
 } let i = Number.isSafeInteger(a) ? Math.max(e, a) : e; !t && n && Number.isSafeInteger(n.scannedThroughHeight) && (i = Math.max(i, n.scannedThroughHeight + 1)); if (i > r)
-    return null; for (let t = i; t <= r; t++) {
-    const a = await getParsedBlockInscriptionsWithRetry(t);
-    for (const r of a)
-        if (isValidBitmapParsedInscription(r, e))
-            return foundBitmapCache.set(e, r), await persistBitmapSearch(e, t, r.id, t), r;
-    (t === r || (t - i + 1) % 250 == 0) && await persistBitmapSearch(e, t);
+    return null; for (let first = i; first <= r; first += 16) {
+    const batch = await getBitmapBlockClaimsBatch(first, Math.min(first + 15, r));
+    for (const block of batch) {
+        const t = block.height;
+        for (const claim of block.claims) if (claim.bitmapNumber === e) {
+            const candidate = await verifyBitmapCandidate(e, claim.id);
+            if (candidate) {
+                foundBitmapCache.set(e, candidate.parsed);
+                await persistBitmapSearch(e, t, candidate.id, t);
+                return candidate.parsed;
+            }
+        }
+        (t === r || (t - i + 1) % 250 === 0) && await persistBitmapSearch(e, t);
+    }
 } return null; }; if (t)
     return await r(); const n = r().finally(() => bitmapPromiseCache.delete(e)); return bitmapPromiseCache.set(e, n), await n; }
 async function scanBitmapClaimInternal(e, { maxScanBlocks: t = 64, forceRefresh: a = !1, persist: r = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
@@ -604,12 +612,18 @@ async function scanBitmapClaimInternal(e, { maxScanBlocks: t = 64, forceRefresh:
         return r && await persistBitmapRecord(s, n), await persistBitmapSearch(e, o, i.id, o, r), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: o, ...s };
     }
 } const i = a ? null : await trustedBitmapSearchSafe(e); let o = e; !a && i && Number.isSafeInteger(i.scannedThroughHeight) && (o = Math.max(o, i.scannedThroughHeight + 1)); if (o > n)
-    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: n, scannedThroughHeight: n, nextHeight: null }; const c = Math.min(n, o + t - 1); for (let t = o; t <= c; t++) {
-    const a = await getParsedBlockInscriptionsWithRetry(t);
-    for (const i of a)
-        if (isValidBitmapParsedInscription(i, e)) {
-            const a = await getInscriptionInfo(i.id, { forceRefresh: !1 }), o = normaliseHeight(a), c = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: i.id, sat: a?.sat ?? null, height: o, number: a?.number ?? null, address: a?.address ?? null, output: a?.output ?? null, satpoint: a?.satpoint ?? null, timestamp: a?.timestamp ?? null, source: "bounded-live-block-scan" };
-            return foundBitmapCache.set(e, i), await persistBitmapSearch(e, t, i.id, t, r), r && await persistBitmapRecord(c, n), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: t, ...c };
+    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: n, scannedThroughHeight: n, nextHeight: null }; const c = Math.min(n, o + t - 1); for (let first = o; first <= c; first += 16) {
+    const batch = await getBitmapBlockClaimsBatch(first, Math.min(first + 15, c), { persist: r, forceRefresh: a });
+    for (const block of batch) for (const claim of block.claims)
+        if (claim.bitmapNumber === e) {
+            const candidate = await verifyBitmapCandidate(e, claim.id, { forceRefresh: a });
+            if (!candidate) continue;
+            const info = candidate.info, height = normaliseHeight(info);
+            const result = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: claim.id, sat: info?.sat ?? null, height, number: info?.number ?? null, address: info?.address ?? null, output: info?.output ?? null, satpoint: info?.satpoint ?? null, timestamp: info?.timestamp ?? null, source: "bounded-shared-block-index" };
+            foundBitmapCache.set(e, candidate.parsed);
+            await persistBitmapSearch(e, block.height, claim.id, block.height, r);
+            if (r) await persistBitmapRecord(result, n);
+            return { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: block.height, ...result };
         }
 } return await persistBitmapSearch(e, c, null, null, r), { state: "missing", bitmapNumber: e, complete: c >= n, tipHeight: n, scannedThroughHeight: c, nextHeight: c < n ? c + 1 : null }; }
 export async function scanBitmapClaim(e, t = {}) { checkBitmapNumber(e); if (!0 !== t?.forceRefresh && bitmapScanPromiseCache.has(e))
@@ -1052,8 +1066,12 @@ function deleteByHeightIndex(e, t, a) { const r = e.index(t).openKeyCursor(IDBKe
 function deleteByPrimaryKeyRange(e, t) { const a = e.openKeyCursor(IDBKeyRange.lowerBound(t)); a.onsuccess = () => { const t = a.result; t && (e.delete(t.primaryKey), t.continue()); }; }
 async function rollbackStorageFromHeight(e) { if (!indexedDbAvailable())
     return !1; checkBitmapNumber(e), await initialiseStorage(); const t = await openStorageDb(); if (!t)
-    return !1; return await new Promise((a, r) => { const n = t.transaction(["bitmaps", "parcels", "parcelClaims", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "bitmapSearch", "meta"], "readwrite"); deleteByHeightIndex(n.objectStore("bitmaps"), "height", e), deleteByHeightIndex(n.objectStore("parcels"), "height", e), deleteByHeightIndex(n.objectStore("parcelClaims"), "height", e), deleteByPrimaryKeyRange(n.objectStore("mondrians"), e), deleteByPrimaryKeyRange(n.objectStore("blockHashes"), e), n.objectStore("childTrees").clear(), n.objectStore("satChains").clear(), n.objectStore("bitmapSearch").clear(); const i = n.objectStore("bitmapState").openCursor(); i.onsuccess = () => { const t = i.result; if (!t)
-    return; const a = t.value; Number.isSafeInteger(a?.childrenScannedThroughHeight) && a.childrenScannedThroughHeight >= e && (a.childrenScannedThroughHeight = e - 1, a.syncedAt = Date.now(), t.update(a)), t.continue(); }, n.objectStore("meta").put({ key: "watch:lastProcessedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.objectStore("meta").put({ key: "watch:lastProcessedHash", value: null, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.oncomplete = () => a(!0), n.onerror = () => r(n.error), n.onabort = () => r(n.error); }), clearCaches(), notifyStorageSubscribers({ type: "reorg-rollback", rewindHeight: e }), !0; }
+    return !1; return await new Promise((a, r) => { const n = t.transaction(["bitmaps", "parcels", "parcelClaims", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "bitmapSearch", "bitmapBlockIndex", "meta"], "readwrite"); deleteByHeightIndex(n.objectStore("bitmaps"), "height", e), deleteByHeightIndex(n.objectStore("parcels"), "height", e), deleteByHeightIndex(n.objectStore("parcelClaims"), "height", e), deleteByPrimaryKeyRange(n.objectStore("mondrians"), e), deleteByPrimaryKeyRange(n.objectStore("blockHashes"), e), deleteByPrimaryKeyRange(n.objectStore("bitmapBlockIndex"), e), n.objectStore("childTrees").clear(), n.objectStore("satChains").clear(), n.objectStore("bitmapSearch").clear(); const i = n.objectStore("bitmapState").openCursor(); i.onsuccess = () => { const t = i.result; if (!t)
+    return; const a = t.value; Number.isSafeInteger(a?.childrenScannedThroughHeight) && a.childrenScannedThroughHeight >= e && (a.childrenScannedThroughHeight = e - 1, a.syncedAt = Date.now(), t.update(a)), t.continue(); }, (n.objectStore("meta").get("bitmapIndex:lastScannedHeight").onsuccess = function () {
+    const prior = this.result?.value;
+    if (Number.isSafeInteger(prior) && prior >= e)
+        n.objectStore("meta").put({ key: "bitmapIndex:lastScannedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() });
+}), n.objectStore("meta").put({ key: "watch:lastProcessedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.objectStore("meta").put({ key: "watch:lastProcessedHash", value: null, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.oncomplete = () => a(!0), n.onerror = () => r(n.error), n.onabort = () => r(n.error); }), clearCaches(), notifyStorageSubscribers({ type: "reorg-rollback", rewindHeight: e }), !0; }
 async function findReorgRewindHeight(e, t) { const a = Math.max(0, e - t); for (let t = e; t >= a; t--) {
     const e = currentStoredRecord(await idbGet("blockHashes", t));
     if (e?.hash)
@@ -1115,14 +1133,14 @@ catch (e) {
 catch (e) {
     y.lastError = e?.message || String(e), await I({ type: "error", error: e, message: y.lastError, lastProcessedHeight: f });
 } return y; }().finally(() => { b = null; }), b); } function C() { m || (h = setTimeout(async () => { await S(), C(); }, t)); } function N() { m || (m = !0, y.running = !1, null !== h && (clearTimeout(h), h = null), s && v && s.removeEventListener("abort", v)); } const v = () => N(); s && (s.aborted ? N() : s.addEventListener("abort", v, { once: !0 })); const P = S().finally(() => { m || C(); }); return Object.freeze({ stop: N, checkNow: S, ready: P, state: y }); }
-export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapScanPromiseCache.clear(), bitmapSearchCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
+export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapScanPromiseCache.clear(), bitmapSearchCache.clear(), bitmapBlockClaimCache.clear(), bitmapBlockClaimPromiseCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
 export function clearParcelCache(e) { if (void 0 === e)
     return childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), void parcelStateCache.clear(); checkBitmapNumber(e), parcelStateCache.delete(e); }
 export const storage = Object.freeze({ ready: async () => await initialiseStorage(), available: () => indexedDbAvailable(), getBitmap: async (e) => (checkBitmapNumber(e), await storageGetBitmapSafe(e)), getParcel: async (e, t) => (checkParcelNumber(e), checkBitmapNumber(t), await storageGetParcelSafe(e, t)), getBitmapParcels: async (e) => (checkBitmapNumber(e), await storageGetBitmapParcelsSafe(e)), getBitmapState: async (e) => (checkBitmapNumber(e), await storageGetBitmapStateSafe(e)), getMondrian: async (e) => (checkBitmapNumber(e), await storageGetMondrianSafe(e)), async clear() { if (!indexedDbAvailable())
         return !1; const e = await openStorageDb(); if (!e)
         return !1; const t = await clearStorageForProtocolChange(e); return t && (await idbPut("meta", { key: "schema", dbVersion: STORAGE_DB_VERSION, protocolVersion: STORAGE_PROTOCOL_VERSION, sdkName: SDK_NAME, moduleVersion: VERSION, updatedAt: Date.now() }), clearCaches(), notifyStorageSubscribers({ type: "storage-cleared" })), t; }, getChildrenTree: async (e) => (checkInscriptionId(e), await storageGetChildTreeSafe(e)), async getSatChain(e) { if (!Number.isSafeInteger(e) || e < 0)
         throw new TypeError("sat must be a non-negative safe integer"); return await storageGetSatChainSafe(e); }, async getStatus() { const e = await initialiseStorage(); if (!e.available)
-        return { ...e, bitmaps: 0, parcels: 0, bitmapState: 0, mondrians: 0, blockHashes: 0, childTrees: 0, satChains: 0, parcelClaims: 0, bitmapSearch: 0, lastProcessedHeight: null, lastProcessedHash: null, coverageStartHeight: null }; const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch"], [a, r, n, i] = await Promise.all([Promise.all(t.map(e => idbCount(e))), getMetaValue("watch:lastProcessedHeight"), getMetaValue("watch:lastProcessedHash"), getMetaValue("watch:coverageStartHeight")]); return { ...e, ...Object.fromEntries(t.map((e, t) => [e, a[t]])), lastProcessedHeight: r, lastProcessedHash: n, coverageStartHeight: i }; }, subscribe(e) { if ("function" != typeof e)
+        return { ...e, bitmaps: 0, parcels: 0, bitmapState: 0, mondrians: 0, blockHashes: 0, childTrees: 0, satChains: 0, parcelClaims: 0, bitmapSearch: 0, bitmapBlockIndex: 0, lastProcessedHeight: null, lastProcessedHash: null, coverageStartHeight: null }; const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "bitmapBlockIndex"], [a, r, n, i] = await Promise.all([Promise.all(t.map(e => idbCount(e))), getMetaValue("watch:lastProcessedHeight"), getMetaValue("watch:lastProcessedHash"), getMetaValue("watch:coverageStartHeight")]); return { ...e, ...Object.fromEntries(t.map((e, t) => [e, a[t]])), lastProcessedHeight: r, lastProcessedHash: n, coverageStartHeight: i }; }, subscribe(e) { if ("function" != typeof e)
         throw new TypeError("storage.subscribe requires a function"); return storageSubscribers.add(e), ensureStorageChannel(), () => storageSubscribers.delete(e); }, close() { if (storageChannel) {
         try {
             storageChannel.close();
@@ -1130,5 +1148,5 @@ export const storage = Object.freeze({ ready: async () => await initialiseStorag
         catch { }
         storageChannel = null;
     } storageDbPromise && storageDbPromise.then(e => e?.close()).catch(() => { }), storageDbPromise = null, storageInitialisedPromise = null; } });
-const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
+const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, indexBitmapBlocks, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
 export default BitmapSDK;
