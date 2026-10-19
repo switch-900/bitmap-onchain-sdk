@@ -7,6 +7,7 @@ const file = new URL("./ordinals-viewer-probe.html", import.meta.url);
 const consoleFile = new URL("./ordinals-viewer-console.js", import.meta.url);
 const html = await readFile(file, "utf8");
 const consoleJs = await readFile(consoleFile, "utf8");
+const profilerJs = await readFile(new URL("./ordinals-mondrian-profiler-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -37,4 +38,13 @@ test("console probe restores global fetch even after errors", () => {
   assert.match(consoleJs, /finally\s*\{[\s\S]*?globalThis\.fetch=original/);
   assert.match(consoleJs, /\/r\/sat\/25483050779204\/at\/-1\/content/);
   assert.match(consoleJs, /maxScanBlocks:BLOCKS/);
+});
+
+test("840000 viewer performance probe is syntactically valid and read-only", () => {
+  assert.doesNotThrow(() => new Script(profilerJs, { filename: "ordinals-mondrian-profiler-console.js" }));
+  assert.match(profilerJs, /const BITMAP = 840000/);
+  assert.match(profilerJs, /forceRefresh:true,forceLive:true,includeEmptySpaces:true,persist:true/);
+  assert.match(profilerJs, /globalThis\.fetch=nativeFetch/);
+  assert.match(profilerJs, /onTiming:/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(profilerJs), false, "No off-chain fetch URLs are required");
 });
