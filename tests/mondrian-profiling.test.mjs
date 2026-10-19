@@ -91,7 +91,7 @@ test("840000-sized raw block: concurrent block info and detailed telemetry", asy
   assert.deepEqual(paths, ["/r/block/" + HEIGHT, "/r/blockinfo/" + HEIGHT]);
   const required = [
     "mondrian-module", "raw-block-http", "raw-block-json",
-    "raw-block-transaction-parser", "block-transaction-count",
+    "raw-block-hex-decoder", "raw-block-transaction-parser", "block-transaction-count",
     "pattern-derivation", "pattern-resolution", "layout-construction",
     "slot-mapping", "empty-space-construction", "total"
   ];
