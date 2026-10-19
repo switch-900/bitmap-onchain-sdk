@@ -939,10 +939,12 @@ async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a
     throw new Error("No indexed Mondrian pattern is available for block " + e); return { ...await fetchLiveMondrianPattern(e, n), mondrianModule: n }; }
 export async function getBitmapPattern(e, t = {}) { return (await resolveBitmapPattern(e, t)).pattern.slice(); }
 export async function getBitmapPatternInfo(e, t = {}) { const { pattern: a, source: r, cacheSource: n = null } = await resolveBitmapPattern(e, t); return { bitmapNumber: e, pattern: a.slice(), source: r, indexed: "on-chain-pattern-index" === r, cached: "indexeddb" === n }; }
-export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v) {
-    const t = await storageGetMondrianSafe(e);
-    if (t?.slots)
-        return storedMondrianToPublic(t);
+export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v && !n) {
+    const cached = await storageGetMondrianSafe(e);
+    // Stored base layouts omit derived gaps unless includeEmptySpaces was
+    // requested. Never silently return incomplete geometry from IndexedDB.
+    if (Array.isArray(cached?.slots) && (!t || Array.isArray(cached.emptySpaces)))
+        return storedMondrianToPublic(cached);
     if (mondrianCache.has(s))
         return mondrianCache.get(s);
 } const { pattern: c, values: k = null, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
