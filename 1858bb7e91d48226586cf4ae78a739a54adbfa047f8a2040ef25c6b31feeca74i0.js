@@ -1100,6 +1100,50 @@ async function compactSha256(bytes) {
     const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
     return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }
+// Existing, inscribed BrotliOC IIFE from Nexus Inscriber. It exports its API
+// as globalThis.BrotliOC, not through JavaScript module exports.
+// Use only same-origin Ord recursive content, never a remote CDN.
+export const BROTLI_OC_INSCRIPTION_ID = "fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0";
+// The separate classic-script decoder is also supported when already loaded
+// by the host HTML as globalThis.BrotliDecode.
+export const BROTLI_DECODE_INSCRIPTION_ID = "b1d16a7a1ada08b5c7f51837478f578c0abd0973809c439228f28ccd5c38e44ai0";
+let compactBrotliOCInit = null;
+async function loadCompactBrotliOC() {
+    const present = globalThis.BrotliOC;
+    if (present && "function" === typeof present.compress &&
+        "function" === typeof present.decompress) return present;
+    if (!compactBrotliOCInit)
+        compactBrotliOCInit = (async () => {
+            await import("/content/" + BROTLI_OC_INSCRIPTION_ID);
+            const loaded = globalThis.BrotliOC;
+            if (!loaded || "function" !== typeof loaded.compress ||
+                "function" !== typeof loaded.decompress)
+                throw new Error("On-chain BrotliOC missing compress/decompress API");
+            return loaded;
+        })().catch(error => {
+            compactBrotliOCInit = null;
+            throw error;
+        });
+    return compactBrotliOCInit;
+}
+function normaliseCompactByteArray(value) {
+    if (value instanceof Uint8Array) return value;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+    if (value && value.buffer instanceof ArrayBuffer &&
+        Number.isSafeInteger(value.byteLength) && value.byteLength >= 0)
+        return new Uint8Array(value.buffer, value.byteOffset || 0, value.byteLength);
+    throw new TypeError("On-chain Brotli codec must return bytes");
+}
+async function onChainCompactBrotli(bytes, compress) {
+    // Existing HTML inscriptions sometimes preload the original BrotliDecode
+    // as a classic script. Use it without introducing another dependency.
+    if (!compress && "function" === typeof globalThis.BrotliDecode)
+        return normaliseCompactByteArray(await globalThis.BrotliDecode(bytes));
+    const codec = await loadCompactBrotliOC();
+    return normaliseCompactByteArray(compress ?
+        await codec.compress(bytes, { quality: 11 }) :
+        await codec.decompress(bytes));
+}
 async function compactCodec(bytes, format, compress, brotliDecoder = null) {
     if ("none" === format) return bytes;
     if (format !== "gzip" && format !== "brotli")
@@ -1121,8 +1165,18 @@ async function compactCodec(bytes, format, compress, brotliDecoder = null) {
         if ("function" === typeof type) codec = new type(nativeFormat);
     } catch { }
     if (!codec) {
-        throw new Error("Native " + format + " " + (compress ? "compression" : "decompression") +
-            " unavailable; supply an explicit on-chain Brotli decoder if decoding Brotli");
+        if (format === "brotli") {
+            // Native decompression is preferable. If it is unavailable, use
+            // the already-inscribed decoder/encoder with the same-origin path.
+            const out = await onChainCompactBrotli(bytes, compress);
+            const maximum = compress ? MAX_COMPACT_PAYLOAD_BYTES :
+                Math.ceil(MAX_COMPACT_TRANSACTIONS / 2);
+            if (out.length > maximum)
+                throw new Error("On-chain Brotli codec output exceeds limit");
+            return out;
+        }
+        throw new Error("Native gzip " + (compress ? "compression" : "decompression") +
+            " unavailable in this browser");
     }
     const stream = new Blob([bytes]).stream().pipeThrough(codec);
     const reader = stream.getReader();
@@ -1686,5 +1740,5 @@ export const storage = Object.freeze({ ready: async () => await initialiseStorag
         catch { }
         storageChannel = null;
     } storageDbPromise && storageDbPromise.then(e => e?.close()).catch(() => { }), storageDbPromise = null, storageInitialisedPromise = null; } });
-const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, packBitmapPattern, unpackBitmapPattern, getBitmapPatternManifest, decodeBitmapPatternManifest, getBitmapGeometryFromPattern, getBitmapGeometryFromManifest, cacheBitmapPatternManifest, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, indexBitmapBlocks, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
+const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, packBitmapPattern, unpackBitmapPattern, getBitmapPatternManifest, decodeBitmapPatternManifest, getBitmapGeometryFromPattern, getBitmapGeometryFromManifest, cacheBitmapPatternManifest, BROTLI_OC_INSCRIPTION_ID, BROTLI_DECODE_INSCRIPTION_ID, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, indexBitmapBlocks, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
 export default BitmapSDK;
