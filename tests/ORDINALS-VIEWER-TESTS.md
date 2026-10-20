@@ -257,3 +257,32 @@ Treat this manifest as a review artifact only. Do not wire it into
 canonical SDK lookups or spend inscription fees until the proposed
 pattern source, coverage model, reorg handling and authenticity
 requirements have been reviewed explicitly.
+
+## G. Existing on-chain BrotliOC runtime compatibility
+
+Paste the complete contents of
+[ordinals-brotli-compat-console.js](./ordinals-brotli-compat-console.js)
+into DevTools within a live Ordinals HTML inscription document.
+
+The test probes `DecompressionStream("brotli")` independently of the
+browser's automatic HTTP `Content-Encoding: br` handling, then imports the
+already-inscribed same-origin JavaScript module
+`/content/fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0`
+(which Nexus Inscriber uses as `globalThis.BrotliOC`). It decodes the **real**
+405-byte `840000.bitmap` Brotli fixture to the original 1,525-byte packed
+pattern and checks SHA-256
+`3469c9067eade08b6a0213345d3d22f0751790e425d67eb304c72faf5c29e858`.
+It also reports compression and module-load timings.
+
+`window.__bitmapBrotliOnchainProbe` stores the result. It is read-only:
+no signing, network providers outside the same Ord origin, inscription or
+deployment. Success in simulated GitHub tests is **not** evidence the
+actual inscription is loading correctly; use this browser test for that.
+
+Separately the original classic-script decoder is known in Nexus' existing
+relay as `BrotliDecode(bytes)`:
+`/content/b1d16a7a1ada08b5c7f51837478f578c0abd0973809c439228f28ccd5c38e44ai0`.
+The experimental SDK uses that global if the host HTML already loaded it.
+The supplied `5ea902d20bbeec73c8c38a6e6dc26b2c37bf40ac8caced5d95f15e1676b606f1i0`
+inscription's own runtime API has not been inspected, so this test and SDK
+do not assume an export or load behaviour for it.
