@@ -169,3 +169,53 @@ fees, network requests and browser download latency remain to be accounted for.
 Although the transport checksum and reconstruction tests pass, this is still
 an **uninscribed experimental transport**, not a consensus-authenticated
 source or permission to populate canonical trusted indexes.
+
+## 2026-10-20 real three-block head-to-head comparison
+
+The user reran the 839999–840001 test with separate per-pattern compression.
+All pattern, Brotli and gzip roundtrips passed. The observations:
+
+| Encoding approach | Brotli-11 output | Notes |
+| --- | ---: | --- |
+| Three separately compressed bare nibble patterns | **1,386 bytes** | No height, block hash, count or checksum supplied |
+| One full three-block binary bundle (v1) | **1,611 bytes** | 8-byte bundle header, three 76-byte metadata headers |
+| Three separately compressed self-describing v1 records | **1,711 bytes** | Each has standalone header and metadata |
+| Full v1 bundle with gzip | 1,873 bytes | Same v1 binary input |
+
+The v1 bundle saves **100 bytes (5.8%)** versus three separately compressed
+self-describing records, but occupies **225 bytes more** than three
+*bare* patterns without any indexing metadata. These comparisons do not
+include an inscription envelope, a separate directory or per-inscription
+network requests and fees. Total experiment runtime **5,794.1 ms** includes
+raw-block retrieval for 839999 and 840001 and is NOT compact lookup latency.
+
+### Lean-header experiment (not an approved format)
+
+The original v1 binary bundle uses 76 metadata bytes per record:
+height (4), transaction count (4), block hash (32), packed-pattern SHA-256 (32),
+payload length (4). An experimental lean version removes the **redundant
+per-record SHA-256** and retains the other 44 bytes. The complete binary
+bundle's SHA-256 would instead need to be anchored in a separate,
+versioned *authenticated* directory, alongside an actual on-chain bundle
+locator. That directory is **not designed or inscribed yet**. No hash,
+whether internal or directory-based, proves canonical Bitcoin-output-derived
+pattern correctness.
+
+The read-only test
+[`ordinals-real-3block-header-compare-console.js`](ordinals-real-3block-header-compare-console.js)
+uses the in-tab `window.__bitmapReal3BlockPackedFixture` from the previous
+three-block experiment to compare real pattern payloads in v1 (76-byte)
+and lean (44-byte) per-record formats, with Brotli quality 11, complete
+record/byte roundtrips and checksum checks. It makes **no raw block requests**.
+The lean variant is for sizing only; it has NOT been integrated into SDK
+production lookups or trusted storage. Await measurements before choosing it.
+
+### Access-pattern decision still open
+
+Three separate single-block requests can retrieve only the target block,
+whereas a single combined bundle may require downloading and decoding the
+entire group for one lookup. Larger bundles may save more per-inscription
+overhead but can hurt random access. Measure cold and warm fetch/decode,
+selection and index lookup, including directory metadata, before fixing
+32/64/128-block groups. Do not extrapolate from only three neighbouring
+heights.
