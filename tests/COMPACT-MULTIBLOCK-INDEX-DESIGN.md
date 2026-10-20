@@ -203,10 +203,16 @@ pattern correctness.
 
 The read-only test
 [`ordinals-real-3block-header-compare-console.js`](ordinals-real-3block-header-compare-console.js)
-uses the in-tab `window.__bitmapReal3BlockPackedFixture` from the previous
-three-block experiment to compare real pattern payloads in v1 (76-byte)
-and lean (44-byte) per-record formats, with Brotli quality 11, complete
-record/byte roundtrips and checksum checks. It makes **no raw block requests**.
+reuses `window.__bitmapReal3BlockPackedFixture` when available. After a page
+refresh or switching viewers, it **self-recovers**, deriving patterns for
+839999 and 840001 through the original SDK's forced-live raw-block path,
+and decoding the earlier verified 840000 Brotli fixture. This first recovery
+may fetch two raw Bitcoin blocks; repeat executions in the same tab reuse
+the reconstructed fixture without re-fetching. It then compares v1 (76-byte)
+and lean (44-byte) per-record formats using the same three raw-derived
+patterns, with Brotli quality 11, complete record/byte roundtrips and checksum
+checks. The report exposes `fixtureRebuilt`, `rawHeightsFetched` and
+`fixtureRebuildMs`.
 The lean variant is for sizing only; it has NOT been integrated into SDK
 production lookups or trusted storage. Await measurements before choosing it.
 
