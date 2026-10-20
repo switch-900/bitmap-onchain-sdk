@@ -286,3 +286,36 @@ The experimental SDK uses that global if the host HTML already loaded it.
 The supplied `5ea902d20bbeec73c8c38a6e6dc26b2c37bf40ac8caced5d95f15e1676b606f1i0`
 inscription's own runtime API has not been inspected, so this test and SDK
 do not assume an export or load behaviour for it.
+
+## H. Warm on-chain Brotli versus native gzip in a real Ordinals viewer
+
+Run [ordinals-codec-benchmark-console.js](./ordinals-codec-benchmark-console.js)
+in the DevTools Console of an inscribed Ord HTML viewer. It uses **exact**
+840000.bitmap packed bytes with the recorded SHA-256
+`3469c9067eade08b6a0213345d3d22f0751790e425d67eb304c72faf5c29e858`:
+
+- Brotli: 405 compressed bytes, decoded using the existing inscribed
+  `BrotliOC.decompress()`
+- Gzip: 479 compressed bytes, decoded by the browser's native
+  `DecompressionStream("gzip")`
+
+The probe never fetches `/r/block/840000` or modifies any SDK storage.
+It measures import time, first decompression of each format (potential
+lazy module/codec setup), two subsequent warmups, and ten alternating
+timed decompressions of **each** format. Every operation checks output
+against the same 1,525-byte reference; the reference is also checked
+with SHA-256. Warm summary includes median, mean, p90 and range.
+Import time and SHA-256 are outside the steady-state decode timing.
+
+Results are saved to `window.__bitmapCodecBenchmark840000`.
+Display them with:
+
+```js
+console.log(JSON.stringify(window.__bitmapCodecBenchmark840000,null,2))
+```
+
+Run on the same Ord viewer page to compare with previously measured
+BrotliOC results. A test run on a warm page does not measure a brand-new
+browser/module initialization. The test is **read-only** and does not inscribe
+or merge anything. Compression ratios alone do not establish total
+runtime performance. Do not infer warm latency from first-call times.
