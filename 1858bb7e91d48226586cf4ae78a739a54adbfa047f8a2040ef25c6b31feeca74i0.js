@@ -1096,6 +1096,16 @@ async function compactCodec(bytes, format, compress, brotliDecoder = null) {
     if ("none" === format) return bytes;
     if (format !== "gzip" && format !== "brotli")
         throw new Error("Unsupported compact Mondrian compression: " + format);
+    // Caller-provided on-chain Brotli decoding is explicit and takes priority:
+    // browsers with native Brotli support must behave exactly the same.
+    if (!compress && format === "brotli" && "function" === typeof brotliDecoder) {
+        const decoded = await brotliDecoder(bytes);
+        if (!(decoded instanceof Uint8Array))
+            throw new TypeError("Brotli decoder must return Uint8Array");
+        if (decoded.length > Math.ceil(MAX_COMPACT_TRANSACTIONS / 2))
+            throw new Error("Compact Mondrian Brotli output exceeds limit");
+        return decoded;
+    }
     const type = compress ? globalThis.CompressionStream : globalThis.DecompressionStream;
     const nativeFormat = format;
     let codec = null;
@@ -1103,12 +1113,6 @@ async function compactCodec(bytes, format, compress, brotliDecoder = null) {
         if ("function" === typeof type) codec = new type(nativeFormat);
     } catch { }
     if (!codec) {
-        if (!compress && format === "brotli" && "function" === typeof brotliDecoder) {
-            const decoded = await brotliDecoder(bytes);
-            if (!(decoded instanceof Uint8Array))
-                throw new TypeError("Brotli decoder must return Uint8Array");
-            return decoded;
-        }
         throw new Error("Native " + format + " " + (compress ? "compression" : "decompression") +
             " unavailable; supply an explicit on-chain Brotli decoder if decoding Brotli");
     }
