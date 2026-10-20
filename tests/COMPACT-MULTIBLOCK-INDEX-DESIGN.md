@@ -138,3 +138,34 @@ unindexed heights. Even compressed hundreds-of-bytes-per-block records become
 large and potentially costly across hundreds of thousands of blocks.
 The multi-block bundle prototype tests transport savings only; neither all-
 chain coverage nor a new canonical pointer is authorised or established.
+
+## First observed REAL contiguous three-block bundle: 839999–840001
+
+User ran the read-only Ord viewer probe on 2026-10-20:
+
+| Height | Source | Transaction count | Nibble-packed bytes |
+| ---: | --- | ---: | ---: |
+| 839999 | raw Bitcoin block through inscribed SDK | 2,328 | 1,164 |
+| 840000 | earlier raw-derived, SHA-verified fixture | 3,050 | 1,525 |
+| 840001 | raw Bitcoin block through inscribed SDK | 2,823 | 1,412 |
+
+- Total packed pattern bytes: **4,101**; combined transaction count: **8,201**.
+- Bundle binary total: **4,337 bytes**, including **236 bytes** of current
+  format record headers (8 base + 3 × 76 record headers).
+- Whole-bundle Brotli quality 11: **1,611 bytes**; native gzip: **1,873 bytes**.
+- Record encode/decode equality and both compression roundtrips: **passed**.
+- End-to-end experiment: **18,392.3 ms**, including two forced-live raw-block
+  fetch/derivation operations, so this is **not** a compact-bundle loading time.
+
+**Do not conclude yet that whole-bundle Brotli beats three separately compressed
+patterns**: the original test did not report those three compressed sizes.
+The updated `ordinals-real-3block-bundle-console.js` now compares whole-bundle
+Brotli against (a) independent Brotli-compressed bare patterns and
+(b) independent Brotli-compressed self-describing single-record bundles,
+with gzip equivalents. It checks each individual codec roundtrip and retains
+packed fixtures in memory for future tests. An inscription directory, envelope
+fees, network requests and browser download latency remain to be accounted for.
+
+Although the transport checksum and reconstruction tests pass, this is still
+an **uninscribed experimental transport**, not a consensus-authenticated
+source or permission to populate canonical trusted indexes.
