@@ -5,7 +5,7 @@ One on-chain JS SDK for:
 • Parcel validation + tie-breaks
 • Mondrian geometry
 • provenance + reinscriptions
-• shared IndexedDB caching
+• shared IndexedDB caching and reusable block-coverage indexing
 • live block watching
 
 One import. No rebuilding the same Bitmap logic in every app.
@@ -146,6 +146,82 @@ available. Each saved checkpoint is tied to its block hash; if that hash changes
 the SDK discards the cursor and restarts from the Bitmap height. A caller cannot
 skip unscanned heights and then treat a later claim as canonical.
 
+
+---
+
+# Shared Bitmap block index (v1.0.3)
+
+Bitmap SDK now records **per-block Bitcoin coverage** in a separate IndexedDB
+store named `bitmapBlockIndex`. Each record saves the height, validated block
+hash and minimal valid raw-text Bitmap claim candidates. It **also records empty
+blocks**, so an earlier scan can accelerate a different Bitmap lookup.
+
+The SDK does **not** equate an indexed candidate with a canonical winner.
+Lookups still proceed in ascending Bitcoin height order, verify candidate
+inscriptions against their genesis-block raw bodies, reject invalid and
+premature claims, and prefer the earliest valid claim. The shared index is
+local browser acceleration, not a central authority.
+
+### Opt-in bounded background range indexing
+
+```js
+const summary = await BitmapSDK.indexBitmapBlocks({
+  // Omit startHeight to resume the previously indexed modern range.
+  // Use an explicit height to backfill historical Bitcoin blocks.
+  maxBlocks: 256,     // cap each invocation, 1..2048
+  concurrency: 8,     // parallel block requests, 1..16
+  confirmations: 6,   // skip the most recent 6 blocks
+  onProgress: p => {
+    console.log(p.height, p.processedBlocks, p.fetchedBlocks);
+  }
+});
+
+console.log(summary);
+// { startHeight, scannedThroughHeight, processedBlocks,
+//   fetchedBlocks, reusedBlocks, bitmapCandidates, nextHeight, ... }
+```
+
+Call this function repeatedly when building the browser's complete Bitmap
+coverage; it deliberately limits work per invocation. By default it starts
+at height **942,000**, where the SDK's modern live discovery begins. Earlier
+Bitmaps still use the existing historical OCI fallback; to build local coverage
+before the cutover, supply `startHeight` explicitly.
+
+The indexing cursor is saved in IndexedDB when available. Subsequent calls
+revisit a small recent overlap to check for reorganisations, while ensuring
+forward progress even with small `maxBlocks` settings. If IndexedDB is
+unavailable, the in-memory cache still helps during the current page session,
+but the cursor is not persisted.
+
+`scanBitmapClaim()` and `getBitmapInscriptionId()` automatically reuse
+this index. The existing `watchBlocks()` also adds scanned blocks to the
+shared coverage store, allowing newly mined blocks to participate in future
+lookups without another raw-block download.
+
+### Trust, reorganisation and performance notes
+
+- Before reusing a stored block, the SDK confirms its stored block hash
+  against `/r/blockhash/<height>`. If it changes, affected local canonical
+  caches and search checkpoints are rewound before fetching current data.
+- New raw-block indexing checks the height's hash both before and after parsing
+  to avoid persisting an index across a detected reorganisation.
+- Scans run concurrently in 16-height batches, but **candidate selection is
+  processed in ascending height order**, even when requests finish out of order.
+- A previously covered block ordinarily needs a lightweight hash check rather
+  than another `/r/block/<height>` raw download. This lowers raw-block bytes
+  and parsing effort but does **not** eliminate blockchain requests.
+- IndexedDB belongs to the browser origin. It is **not a shared index between
+  unrelated browsers or inscription origins**, and it is not an on-chain
+  snapshot.
+- This is a source-level optimisation; live full-chain performance and
+  persistent IndexedDB/reorganisation behaviour need real-browser validation.
+  Do not treat an incomplete local range as evidence a Bitmap is unclaimed.
+
+The v1.0.3 database upgrade adds the block store (schema version 3) while
+preserving the validation protocol version, so compatible existing cache
+records are not deliberately discarded.
+
+
 ---
 
 # Parcels
@@ -220,6 +296,102 @@ When multiple valid claims compete for the same Parcel, Bitmap SDK applies the p
 Applications should use the SDK result rather than implementing a separate tie-break.
 
 ---
+
+
+## Compact Mondrian pattern manifests (experimental v1.0.3)
+
+Compact patterns can make Bitmap geometry portable without carrying an entire
+raw Bitcoin block. For block `840000`, an independently exported pattern with
+3,050 elements occupies **1,525 bytes** when nibble-packed. The user's browser
+gzip test produced **479 bytes**; offline Brotli quality 11 achieved **405
+bytes** for the exact same 1,525 bytes. Actual inscription payload and runtime
+size depend on the index representation and decoder.
+
+Use these **opt-in** public APIs:
+
+```js
+// Export an integrity-checked candidate from live recursive Bitcoin data.
+// "auto" tries built-in Brotli, then gzip, otherwise leaves the data unpacked.
+const manifest = await BitmapSDK.getBitmapPatternManifest(840000, {
+  forceLive: true,
+  compression: "auto" // or "none", "gzip", "brotli"
+})
+
+// Verify SHA-256, unpack size classes and inspect the derived pattern.
+// This does NOT establish independent on-chain authenticity.
+const decoded = await BitmapSDK.decodeBitmapPatternManifest(manifest)
+console.log(decoded.pattern.length, decoded.integrityVerified)
+
+// Geometry reconstruction does not fetch /r/block unless requested.
+const preview = await BitmapSDK.getBitmapGeometryFromManifest(manifest, {
+  includeEmptySpaces: true
+})
+console.log(preview.slots.length, preview.emptySpaces.length)
+console.log(preview.verifiedAgainstRawBlock) // false
+
+// Explicit canonical verification before allowing a new manifest into
+// the SDK's trusted, local IndexedDB pattern cache:
+await BitmapSDK.cacheBitmapPatternManifest(manifest)
+
+// Subsequent calls can reuse raw-verified compact pattern data.
+// Changed block hashes cause this cache to be skipped.
+const info = await BitmapSDK.getBitmapPatternInfo(840000)
+console.log(info.source)
+```
+
+For directly supplied size arrays, `packBitmapPattern(pattern)`,
+`unpackBitmapPattern(bytes, transactionCount)`, and
+`getBitmapGeometryFromPattern(height, pattern, {includeEmptySpaces:true})`
+are also available.
+
+**Brotli compatibility:** The SDK first probes native
+`DecompressionStream("brotli")` (or `CompressionStream("brotli")` for encoding).
+That particular JavaScript stream format differs from the browser's
+automatic decoding of `Content-Encoding: br` HTTP responses and is not
+available in every browser.
+
+Where the native stream format is unavailable, the SDK automatically
+reuses the already-inscribed Nexus BrotliOC module:
+`/content/fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0`.
+It exposes `globalThis.BrotliOC.compress(bytes, {quality:11})` and
+`globalThis.BrotliOC.decompress(bytes)`, and is lazy-loaded only when needed.
+If the host HTML has already loaded the classic script
+`/content/b1d16a7a1ada08b5c7f51837478f578c0abd0973809c439228f28ccd5c38e44ai0`
+and exposes `globalThis.BrotliDecode(bytes)`, the SDK can also reuse that
+decoder without another import. Both paths stay on the existing Ord
+`/content/` recursive origin. A separate 5ea902d20bbe... inscription URL
+was supplied but its runtime API has not yet been verified, so no dependency
+on that URL is introduced.
+
+An explicit `decodeBitmapPatternManifest(manifest, {brotliDecoder})`
+callback remains supported and takes priority over automatic selection.
+The module's compressed result is validated against the uncompressed
+pattern length, nibble range and SHA-256 before being accepted. No third-party
+CDN or separately bundled Brotli implementation is required.
+
+**Note:** Brotli-compressed *inscription content* using the Ord tag-9
+`content-encoding: br` mechanism is distinct from a Base64 Brotli
+field inside a JSON manifest. The latter requires the manifest decoding path
+described above; do not add a second Brotli layer accidentally.
+
+**Security and trust:** The manifest's SHA-256 authenticates nothing on its
+own if the publisher controls both the payload and checksum. A matching
+Bitcoin block hash and transaction count likewise do not prove that the
+nibble pattern was derived correctly. The preview API explicitly marks
+imported geometry `verifiedAgainstRawBlock: false` and **never inserts it
+into the trusted geometry cache**. The trusted cache import first recomputes
+the entire pattern from `/r/block/<height>` and checks hash stability.
+Cache entries store the raw-verified compressed representation separately
+from existing full Mondrian layouts and re-check the block hash on reads.
+These protections are deliberate; simply supplying `verifyAgainstRawBlock:
+false` cannot bypass trusted import.
+
+There is **no automatic fetch from an unverified external manifest URL** and
+no newly inscribed on-chain index. The read-path first prefers the existing
+full Mondrian geometry record, then the independently verified local compact
+pattern store before falling back to the existing on-chain Mondrian pattern
+module and raw Bitcoin block. Exact transaction output values still require
+the raw block. This is an experimental SDK branch, not an inscribed release.
 
 # Mondrian geometry
 
@@ -298,9 +470,19 @@ console.log(patternInfo.indexed)
 console.log(patternInfo.cached)
 ```
 
-`indexed === true` means the pattern came from the canonical on-chain
-Mondrian/Bitmon pattern index. `cached` only describes whether IndexedDB
+`indexed === true` indicates a match from the **selective Bitmon
+repeated-pattern catalogue** inside the existing on-chain Mondrian module.
+That catalogue is **not intended to index every Bitcoin block**. A missing
+entry is normal and does not mean that Bitmap geometry is unavailable:
+the SDK can derive the distinct per-block pattern from raw Bitcoin transaction
+outputs. The name `on-chain-pattern-index` is retained as a legacy source
+identifier for existing consumers; it should not be interpreted as general
+Bitcoin-block index coverage. `cached` only describes whether IndexedDB
 accelerated the lookup; it does not change the underlying provenance.
+
+The proposed compact multi-block Bitmap bundle is a **different optional
+transport/cache** for general Bitmap patterns. It does not add entries to
+the Bitmon catalogue or change what qualifies as a Bitmon.
 
 Bitmap SDK can derive live Mondrian data from the recursive raw block endpoint:
 
@@ -683,6 +865,7 @@ scanBitmapClaim()
 getBitmapData()
 getBitmapInscriptionId()
 getBitmapSat()
+indexBitmapBlocks()
 syncBitmap()
 ```
 
@@ -841,7 +1024,7 @@ suitable for an on-chain JavaScript inscription.
 # Version
 
 ```text
-Bitmap SDK v1.0.1
+Bitmap SDK v1.0.3
 ```
 
 Canonical SDK sat:

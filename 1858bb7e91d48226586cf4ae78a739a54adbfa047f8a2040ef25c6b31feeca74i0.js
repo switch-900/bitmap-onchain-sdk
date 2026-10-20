@@ -1,5 +1,5 @@
 /*
- * Bitmap SDK v1.0.2
+ * Bitmap SDK v1.0.3
  *
  * On-chain Bitmap development SDK.
  *
@@ -36,13 +36,13 @@
 import { getBitmapSat as indexSat, getBitmapInscriptionId as indexInscriptionId } from "/content/942b5886158d57fc70cb8fb7d9bd4d37aa95b8b145be1a351326336b087262dbi0";
 import { fetchBlock, listInscriptions, toHex } from "/content/bbbb2172ebca174579884df1ad7487196c39e860b3aacdf4e052a33bf5ec31fai0";
 export const SDK_NAME = "Bitmap SDK";
-export const VERSION = "1.0.2";
+export const VERSION = "1.0.3";
 export const OLD_OCI_LIMIT = 942e3;
 export const MONDRIAN_MODULE_ID = "55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0";
 export const STORAGE_DB_NAME = "bitmap-sdk";
-export const STORAGE_DB_VERSION = 2;
+export const STORAGE_DB_VERSION = 4;
 export const STORAGE_PROTOCOL_VERSION = "bitmap-sdk-v1.0.1";
-const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapScanPromiseCache = new Map, bitmapSearchCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
+const STORAGE_CHANNEL_NAME = "bitmap-sdk-v1.0.1", REQUEST_TIMEOUT_MS = 2e4, LIVE_CACHE_TTL_MS = 3e4, BLOCK_CACHE_LIMIT = 32, MAX_PAGINATION_PAGES = 1e5, SYNC_LEASE_MS = 12e4, SYNC_LEASE_POLL_MS = 250, foundBitmapCache = new Map, bitmapPromiseCache = new Map, bitmapScanPromiseCache = new Map, bitmapSearchCache = new Map, bitmapBlockClaimCache = new Map, bitmapBlockClaimPromiseCache = new Map, blockInfoCache = new Map, rawTransactionCountCache = new Map, parcelContentCache = new Map, parsedBlockCache = new Map, parsedBlockPromiseCache = new Map, parentIdsCache = new Map, inscriptionInfoCache = new Map, childrenDetailsCache = new Map, childrenDetailsPromiseCache = new Map, parcelStateCache = new Map, mondrianCache = new Map;
 let mondrianModulePromise = null, tipCache = { height: null, expiresAt: 0 };
 function getTtl(e, t) { const a = e.get(t); if (a) {
     if (!(Date.now() >= a.expiresAt))
@@ -159,9 +159,9 @@ function openStorageDb() { if (!indexedDbAvailable())
 }
 catch (e) {
     return void n(null, e);
-} r = setTimeout(() => n(null, new Error("IndexedDB open timed out")), 2500), t.onerror = () => n(null, t.error || new Error("Failed to open IndexedDB")), t.onblocked = () => n(null, new Error("IndexedDB upgrade blocked by another tab")), t.onupgradeneeded = () => { const e = t.result, a = t.transaction, r = (t, r) => e.objectStoreNames.contains(t) ? a.objectStore(t) : e.createObjectStore(t, r); r("meta", { keyPath: "key" }); const n = r("bitmaps", { keyPath: "bitmapNumber" }); ensureIndex(n, "inscriptionId", "inscriptionId"), ensureIndex(n, "height", "height"); const i = r("parcels", { keyPath: ["bitmapNumber", "parcelNumber"] }); ensureIndex(i, "bitmapNumber", "bitmapNumber"), ensureIndex(i, "inscriptionId", "id"), ensureIndex(i, "height", "height"), ensureIndex(r("bitmapState", { keyPath: "bitmapNumber" }), "childrenScannedThroughHeight", "childrenScannedThroughHeight"), r("mondrians", { keyPath: "bitmapNumber" }), r("blockHashes", { keyPath: "height" }), ensureIndex(r("childTrees", { keyPath: "rootId" }), "syncedThroughHeight", "syncedThroughHeight"), ensureIndex(r("satChains", { keyPath: "sat" }), "syncedThroughHeight", "syncedThroughHeight"); const o = r("parcelClaims", { keyPath: ["bitmapNumber", "id"] }); ensureIndex(o, "bitmapNumber", "bitmapNumber"), ensureIndex(o, "height", "height"); const s = r("bitmapSearch", { keyPath: "bitmapNumber" }); ensureIndex(s, "scannedThroughHeight", "scannedThroughHeight"); }, t.onsuccess = () => { const e = t.result; if (a)
+} r = setTimeout(() => n(null, new Error("IndexedDB open timed out")), 2500), t.onerror = () => n(null, t.error || new Error("Failed to open IndexedDB")), t.onblocked = () => n(null, new Error("IndexedDB upgrade blocked by another tab")), t.onupgradeneeded = () => { const e = t.result, a = t.transaction, r = (t, r) => e.objectStoreNames.contains(t) ? a.objectStore(t) : e.createObjectStore(t, r); r("meta", { keyPath: "key" }); const n = r("bitmaps", { keyPath: "bitmapNumber" }); ensureIndex(n, "inscriptionId", "inscriptionId"), ensureIndex(n, "height", "height"); const i = r("parcels", { keyPath: ["bitmapNumber", "parcelNumber"] }); ensureIndex(i, "bitmapNumber", "bitmapNumber"), ensureIndex(i, "inscriptionId", "id"), ensureIndex(i, "height", "height"), ensureIndex(r("bitmapState", { keyPath: "bitmapNumber" }), "childrenScannedThroughHeight", "childrenScannedThroughHeight"), r("mondrians", { keyPath: "bitmapNumber" }), r("blockHashes", { keyPath: "height" }), ensureIndex(r("childTrees", { keyPath: "rootId" }), "syncedThroughHeight", "syncedThroughHeight"), ensureIndex(r("satChains", { keyPath: "sat" }), "syncedThroughHeight", "syncedThroughHeight"); const o = r("parcelClaims", { keyPath: ["bitmapNumber", "id"] }); ensureIndex(o, "bitmapNumber", "bitmapNumber"), ensureIndex(o, "height", "height"); const s = r("bitmapSearch", { keyPath: "bitmapNumber" }); ensureIndex(s, "scannedThroughHeight", "scannedThroughHeight"), r("bitmapBlockIndex", { keyPath: "height" }), r("mondrianPatterns", { keyPath: "height" }); }, t.onsuccess = () => { const e = t.result; if (a)
     return void e.close(); e.onversionchange = () => { e.close(), storageDbPromise = null, storageInitialisedPromise = null; }, n(e); }; }); return storageDbPromise = e, e; }
-async function clearStorageForProtocolChange(e) { const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "meta"].filter(t => e.objectStoreNames.contains(t)); if (!t.length)
+async function clearStorageForProtocolChange(e) { const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "bitmapBlockIndex", "mondrianPatterns", "meta"].filter(t => e.objectStoreNames.contains(t)); if (!t.length)
     return !0; return await new Promise(a => { try {
     const r = e.transaction(t, "readwrite");
     for (const e of t)
@@ -410,7 +410,7 @@ async function persistMondrian(e) { if (!(indexedDbAvailable() && e && Array.isA
     return !1; await initialiseStorage(); let t = null; try {
     t = await getBlockHash(e.bitmapNumber);
 }
-catch { } return await idbPut("mondrians", { bitmapNumber: e.bitmapNumber, source: e.source, transactionCount: e.transactionCount, pattern: e.pattern.slice(), width: e.width, height: e.height, length: e.length ?? null, slots: e.slots.map(e => ({ ...e })), ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {}, blockHash: t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), notifyStorageSubscribers({ type: "mondrian", bitmapNumber: e.bitmapNumber }), !0; }
+catch { } return await idbPut("mondrians", { bitmapNumber: e.bitmapNumber, source: e.source, transactionCount: e.transactionCount, pattern: e.pattern.slice(), width: e.width, height: e.height, length: e.length ?? null, slots: e.slots.map(e => ({ ...e })), ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {}, blockHash: e.blockHash || t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), notifyStorageSubscribers({ type: "mondrian", bitmapNumber: e.bitmapNumber }), !0; }
 async function tryAcquireStorageLease(e, t = 12e4) { if (!indexedDbAvailable())
     return { acquired: !0, persistent: !1, owner: storageInstanceId }; await initialiseStorage(); const a = await openStorageDb(); if (!a)
     return { acquired: !0, persistent: !1, owner: storageInstanceId }; try {
@@ -450,6 +450,165 @@ async function verifyBitmapCandidate(e, t, { forceRefresh: a = !1 } = {}) { if (
 catch {
     return null;
 } }
+
+/* Shared local block coverage; empty blocks matter too. All winners are still
+ * selected by scanning ascending block height and validating the raw claim. */
+let bitmapIndexRewindHeight = null, bitmapIndexRollbackPromise = null;
+async function rewindStaleBitmapIndex(height) {
+    if (!indexedDbAvailable()) return void clearCaches();
+    bitmapIndexRewindHeight = bitmapIndexRewindHeight === null ? height : Math.min(bitmapIndexRewindHeight, height);
+    if (!bitmapIndexRollbackPromise) {
+        bitmapIndexRollbackPromise = (async () => {
+            while (bitmapIndexRewindHeight !== null) {
+                const start = bitmapIndexRewindHeight;
+                bitmapIndexRewindHeight = null;
+                if (!await rollbackStorageFromHeight(start)) {
+                    clearCaches();
+                    throw new Error("Unable to roll back stale Bitmap index at block " + start);
+                }
+            }
+        })().finally(() => { bitmapIndexRollbackPromise = null; });
+    }
+    await bitmapIndexRollbackPromise;
+}
+function bitmapClaimsFromParsedBlock(height, inscriptions) {
+    const claims = [];
+    for (let ordinal = 0; ordinal < inscriptions.length; ordinal++) {
+        const item = inscriptions[ordinal], name = parseBitmapName(strictClaimText(item));
+        if (name && name.bitmapNumber <= height && /^[0-9a-f]{64}i[0-9]+$/i.test(item?.id || ""))
+            claims.push({ bitmapNumber: name.bitmapNumber, id: item.id, ordinal });
+    }
+    return claims;
+}
+function rememberBitmapBlockClaim(record) {
+    bitmapBlockClaimCache.delete(record.height);
+    bitmapBlockClaimCache.set(record.height, record);
+    while (bitmapBlockClaimCache.size > 128)
+        bitmapBlockClaimCache.delete(bitmapBlockClaimCache.keys().next().value);
+}
+async function getIndexedBitmapBlockClaims(height, { forceRefresh = false, persist = true } = {}) {
+    checkBitmapNumber(height);
+    if (!forceRefresh && bitmapBlockClaimPromiseCache.has(height))
+        return await bitmapBlockClaimPromiseCache.get(height);
+    const work = async () => {
+        if (forceRefresh) {
+            bitmapBlockClaimCache.delete(height);
+            parsedBlockCache.delete(height);
+        }
+        let record = !forceRefresh ? bitmapBlockClaimCache.get(height) : null;
+        if (!record && !forceRefresh && indexedDbAvailable()) {
+            await initialiseStorage();
+            record = currentStoredRecord(await idbGet("bitmapBlockIndex", height));
+        }
+        if (record && /^[0-9a-f]{64}$/i.test(record.hash || "") &&
+            Array.isArray(record.claims) && record.claims.every(c =>
+                Number.isSafeInteger(c.bitmapNumber) && c.bitmapNumber >= 0 &&
+                c.bitmapNumber <= height && /^[0-9a-f]{64}i[0-9]+$/i.test(c.id || ""))) {
+            const currentHash = await getBlockHashWithRetry(height);
+            if (currentHash === record.hash) {
+                rememberBitmapBlockClaim(record);
+                return { height, hash: currentHash, claims: record.claims, cached: true };
+            }
+            // A changed block hash can invalidate saved winners and per-Bitmap
+            // watermarks, not only this block's candidate list.
+            await rewindStaleBitmapIndex(height);
+        }
+        // Parser memory caches cannot survive a height's hash changing.
+        bitmapBlockClaimCache.delete(height);
+        parsedBlockCache.delete(height);
+        const before = await getBlockHashWithRetry(height);
+        const parsed = await getParsedBlockInscriptionsWithRetry(height);
+        const after = await getBlockHashWithRetry(height);
+        if (before !== after) {
+            parsedBlockCache.delete(height);
+            throw new Error("Reorganisation while indexing block " + height);
+        }
+        const claims = bitmapClaimsFromParsedBlock(height, parsed);
+        const saved = { height, hash: after, claims, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() };
+        if (persist && indexedDbAvailable()) {
+            const status = await initialiseStorage();
+            if (status.available && !await idbPut("bitmapBlockIndex", saved) && indexedDbAvailable())
+                throw new Error("Failed to persist Bitmap block " + height);
+        }
+        rememberBitmapBlockClaim(saved);
+        return { height, hash: after, claims, cached: false };
+    };
+    if (forceRefresh) return await work();
+    const pending = work().finally(() => bitmapBlockClaimPromiseCache.delete(height));
+    bitmapBlockClaimPromiseCache.set(height, pending);
+    return await pending;
+}
+async function persistParsedBitmapBlock(height, hash, inscriptions) {
+    const stillCurrent = await getBlockHashWithRetry(height);
+    if (stillCurrent !== hash)
+        throw new Error("Reorganisation while recording watched block " + height);
+    const record = {
+        height, hash, claims: bitmapClaimsFromParsedBlock(height, inscriptions),
+        protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now()
+    };
+    if (indexedDbAvailable()) {
+        const status = await initialiseStorage();
+        if (status.available && !await idbPut("bitmapBlockIndex", record) && indexedDbAvailable())
+            throw new Error("Unable to save watched Bitmap block " + height);
+    }
+    rememberBitmapBlockClaim(record);
+}
+async function getBitmapBlockClaimsBatch(first, last, { concurrency = 8, persist = true, forceRefresh = false } = {}) {
+    const heights = Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    return await mapWithConcurrency(heights, concurrency, height =>
+        getIndexedBitmapBlockClaims(height, { persist, forceRefresh }));
+}
+/* Incremental browser index, resumable via IndexedDB. Explicit startHeight
+ * enables backfills; default begins at the legacy OCI cutover height. */
+export async function indexBitmapBlocks({
+    startHeight = null, endHeight = null, maxBlocks = 256, concurrency = 8,
+    confirmations = 6, persist = true, forceRefresh = false, onProgress = null
+} = {}) {
+    if (startHeight !== null) checkBitmapNumber(startHeight);
+    if (endHeight !== null) checkBitmapNumber(endHeight);
+    if (!Number.isSafeInteger(maxBlocks) || maxBlocks < 1 || maxBlocks > 2048)
+        throw new TypeError("maxBlocks must be 1..2048");
+    if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > 16)
+        throw new TypeError("concurrency must be 1..16");
+    if (!Number.isSafeInteger(confirmations) || confirmations < 0 || confirmations > 144)
+        throw new TypeError("confirmations must be 0..144");
+    if (onProgress !== null && typeof onProgress !== "function")
+        throw new TypeError("onProgress must be a function or null");
+    const tipHeight = await getChainHeightCached(), confirmedHeight = tipHeight - confirmations;
+    const resuming = startHeight === null;
+    let first = startHeight;
+    if (resuming) {
+        const cursor = persist && indexedDbAvailable() ? await getMetaValue("bitmapIndex:lastScannedHeight") : null;
+        // Leave room for forward progress even when maxBlocks is 1.
+        const overlap = Math.min(12, maxBlocks - 1);
+        first = Number.isSafeInteger(cursor) && cursor >= OLD_OCI_LIMIT
+            ? Math.max(OLD_OCI_LIMIT, cursor + 1 - overlap) : OLD_OCI_LIMIT;
+    }
+    const last = Math.min(confirmedHeight, endHeight === null ? confirmedHeight : endHeight, first + maxBlocks - 1);
+    let processedBlocks = 0, fetchedBlocks = 0, reusedBlocks = 0, bitmapCandidates = 0;
+    for (let height = first; height <= last; height += 16) {
+        const batch = await getBitmapBlockClaimsBatch(height, Math.min(last, height + 15),
+            { concurrency, persist, forceRefresh });
+        for (const block of batch) {
+            processedBlocks++;
+            bitmapCandidates += block.claims.length;
+            if (block.cached) reusedBlocks++; else fetchedBlocks++;
+            if (onProgress) onProgress({
+                height: block.height, processedBlocks, fetchedBlocks, reusedBlocks, bitmapCandidates
+            });
+        }
+        if (resuming && persist && indexedDbAvailable())
+            await setMetaValue("bitmapIndex:lastScannedHeight", batch[batch.length - 1].height);
+    }
+    return {
+        startHeight: first, scannedThroughHeight: processedBlocks ? last : null,
+        tipHeight, confirmedHeight, processedBlocks, fetchedBlocks, reusedBlocks,
+        bitmapCandidates, complete: last >= confirmedHeight,
+        nextHeight: last < confirmedHeight ? Math.max(first, last + 1) : null,
+        source: "recursive-bitcoin-blocks-and-local-indexeddb"
+    };
+}
+
 async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = null } = {}) { if (checkBitmapNumber(e), t && foundBitmapCache.delete(e), !t && foundBitmapCache.has(e))
     return foundBitmapCache.get(e); if (!t && bitmapPromiseCache.has(e))
     return await bitmapPromiseCache.get(e); const r = async () => { const r = await getChainHeightCached(); if (e > r)
@@ -458,12 +617,20 @@ async function findBitmapInBlocks(e, { forceRefresh: t = !1, startHeight: a = nu
     if (t)
         return foundBitmapCache.set(e, t.parsed), t.parsed;
 } let i = Number.isSafeInteger(a) ? Math.max(e, a) : e; !t && n && Number.isSafeInteger(n.scannedThroughHeight) && (i = Math.max(i, n.scannedThroughHeight + 1)); if (i > r)
-    return null; for (let t = i; t <= r; t++) {
-    const a = await getParsedBlockInscriptionsWithRetry(t);
-    for (const r of a)
-        if (isValidBitmapParsedInscription(r, e))
-            return foundBitmapCache.set(e, r), await persistBitmapSearch(e, t, r.id, t), r;
-    (t === r || (t - i + 1) % 250 == 0) && await persistBitmapSearch(e, t);
+    return null; for (let first = i; first <= r; first += 16) {
+    const batch = await getBitmapBlockClaimsBatch(first, Math.min(first + 15, r));
+    for (const block of batch) {
+        const t = block.height;
+        for (const claim of block.claims) if (claim.bitmapNumber === e) {
+            const candidate = await verifyBitmapCandidate(e, claim.id);
+            if (candidate) {
+                foundBitmapCache.set(e, candidate.parsed);
+                await persistBitmapSearch(e, t, candidate.id, t);
+                return candidate.parsed;
+            }
+        }
+        (t === r || (t - i + 1) % 250 === 0) && await persistBitmapSearch(e, t);
+    }
 } return null; }; if (t)
     return await r(); const n = r().finally(() => bitmapPromiseCache.delete(e)); return bitmapPromiseCache.set(e, n), await n; }
 async function scanBitmapClaimInternal(e, { maxScanBlocks: t = 64, forceRefresh: a = !1, persist: r = !0 } = {}) { checkBitmapNumber(e); if (!Number.isSafeInteger(t) || t < 1 || t > 1e4)
@@ -483,12 +650,18 @@ async function scanBitmapClaimInternal(e, { maxScanBlocks: t = 64, forceRefresh:
         return r && await persistBitmapRecord(s, n), await persistBitmapSearch(e, o, i.id, o, r), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: o, ...s };
     }
 } const i = a ? null : await trustedBitmapSearchSafe(e); let o = e; !a && i && Number.isSafeInteger(i.scannedThroughHeight) && (o = Math.max(o, i.scannedThroughHeight + 1)); if (o > n)
-    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: n, scannedThroughHeight: n, nextHeight: null }; const c = Math.min(n, o + t - 1); for (let t = o; t <= c; t++) {
-    const a = await getParsedBlockInscriptionsWithRetry(t);
-    for (const i of a)
-        if (isValidBitmapParsedInscription(i, e)) {
-            const a = await getInscriptionInfo(i.id, { forceRefresh: !1 }), o = normaliseHeight(a), c = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: i.id, sat: a?.sat ?? null, height: o, number: a?.number ?? null, address: a?.address ?? null, output: a?.output ?? null, satpoint: a?.satpoint ?? null, timestamp: a?.timestamp ?? null, source: "bounded-live-block-scan" };
-            return foundBitmapCache.set(e, i), await persistBitmapSearch(e, t, i.id, t, r), r && await persistBitmapRecord(c, n), { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: t, ...c };
+    return { state: "missing", bitmapNumber: e, complete: !0, tipHeight: n, scannedThroughHeight: n, nextHeight: null }; const c = Math.min(n, o + t - 1); for (let first = o; first <= c; first += 16) {
+    const batch = await getBitmapBlockClaimsBatch(first, Math.min(first + 15, c), { persist: r, forceRefresh: a });
+    for (const block of batch) for (const claim of block.claims)
+        if (claim.bitmapNumber === e) {
+            const candidate = await verifyBitmapCandidate(e, claim.id, { forceRefresh: a });
+            if (!candidate) continue;
+            const info = candidate.info, height = normaliseHeight(info);
+            const result = { valid: !0, claimed: !0, canonical: !0, bitmapNumber: e, name: e + ".bitmap", inscriptionId: claim.id, sat: info?.sat ?? null, height, number: info?.number ?? null, address: info?.address ?? null, output: info?.output ?? null, satpoint: info?.satpoint ?? null, timestamp: info?.timestamp ?? null, source: "bounded-shared-block-index" };
+            foundBitmapCache.set(e, candidate.parsed);
+            await persistBitmapSearch(e, block.height, claim.id, block.height, r);
+            if (r) await persistBitmapRecord(result, n);
+            return { state: "found", complete: !0, tipHeight: n, scannedThroughHeight: block.height, ...result };
         }
 } return await persistBitmapSearch(e, c, null, null, r), { state: "missing", bitmapNumber: e, complete: c >= n, tipHeight: n, scannedThroughHeight: c, nextHeight: c < n ? c + 1 : null }; }
 export async function scanBitmapClaim(e, t = {}) { checkBitmapNumber(e); if (!0 !== t?.forceRefresh && bitmapScanPromiseCache.has(e))
@@ -679,9 +852,36 @@ function patternFromTransactions(e, t, a) { if (!Array.isArray(e))
     if (i += a, !Number.isSafeInteger(i))
         throw new Error("Transaction " + r + " in block " + t + " exceeds safe-integer range");
 } return a.getSquareSize(i); }), t); }
-function rawBlockHexToBytes(e, t) { if ("string" != typeof e || e.length < 162 || e.length % 2 != 0 || !/^[0-9a-f]+$/i.test(e))
-    throw new Error("/r/block/" + t + " returned invalid block hex"); const a = new Uint8Array(e.length / 2); for (let t = 0; t < a.length; t++)
-    a[t] = Number.parseInt(e.slice(2 * t, 2 * t + 2), 16); return a; }
+function rawBlockHexNibble(code) {
+    if (code >= 48 && code <= 57) return code - 48;
+    if (code >= 65 && code <= 70) return code - 55;
+    if (code >= 97 && code <= 102) return code - 87;
+    return -1;
+}
+function rawBlockHexToBytes(hex, height) {
+    const invalid = () => new Error("/r/block/" + height + " returned invalid block hex");
+    if ("string" != typeof hex || hex.length < 162 || 0 !== hex.length % 2)
+        throw invalid();
+    // ES2025 native conversion is dramatically faster than millions of
+    // parseInt/substr allocations. The fallback retains support for older
+    // browsers and validates every byte just as strictly.
+    if ("function" == typeof Uint8Array.fromHex) {
+        try {
+            return Uint8Array.fromHex(hex);
+        } catch {
+            throw invalid();
+        }
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0, offset = 0; i < bytes.length; i++, offset += 2) {
+        const hi = rawBlockHexNibble(hex.charCodeAt(offset));
+        const lo = rawBlockHexNibble(hex.charCodeAt(offset + 1));
+        if (hi < 0 || lo < 0)
+            throw invalid();
+        bytes[i] = hi * 16 + lo;
+    }
+    return bytes;
+}
 function readCompactSize(e, t, a) { if (t.offset >= e.length)
     throw new Error("Truncated " + a); const r = e[t.offset++]; if (r < 253)
     return r; let n = 0; if (253 === r) {
@@ -712,7 +912,11 @@ function readUInt64LE(e, t, a) { if (t.offset + 8 > e.length)
     throw new Error("Truncated " + a); let r = 0n; for (let a = 0; a < 8; a++)
     r += BigInt(e[t.offset + a]) << (8n * BigInt(a)); t.offset += 8; if (r > BigInt(Number.MAX_SAFE_INTEGER))
     throw new Error(a + " exceeds safe integer range"); return Number(r); }
-function parseRawBlockOutputTotals(e, t) { const a = rawBlockHexToBytes(e, t), r = { offset: 80 }, n = readCompactSize(a, r, "block transaction count"); if (n < 1)
+function parseRawBlockOutputTotals(e, t, onTiming = null) {
+    const started = mondrianNow();
+    const a = rawBlockHexToBytes(e, t);
+    reportMondrianStage(onTiming, "raw-block-hex-decoder", started, { height: t, bytes: a.length });
+    const r = { offset: 80 }, n = readCompactSize(a, r, "block transaction count"); if (n < 1)
     throw new Error("Block " + t + " has no transactions"); const i = new Array(n); for (let e = 0; e < n; e++) {
     skipRawBytes(a, r, 4, "transaction version");
     let t = !1;
@@ -748,41 +952,564 @@ function parseRawBlockOutputTotals(e, t) { const a = rawBlockHexToBytes(e, t), r
     skipRawBytes(a, r, 4, "transaction locktime"), i[e] = s;
 } if (r.offset !== a.length)
     throw new Error("Raw block parser ended at byte " + r.offset + " of " + a.length + " for block " + t); return i; }
-async function fetchRecursiveBlockOutputTotals(e) { checkBitmapNumber(e); const t = await fetchWithTimeout("/r/block/" + e); if (!t.ok)
-    throw new Error("/r/block/" + e + " returned HTTP " + t.status); const a = await t.json(); return parseRawBlockOutputTotals(a, e); }
-async function fetchLiveMondrianPattern(e, t) { if ("function" != typeof t?.getSquareSize)
-    throw new Error("Mondrian module does not export getSquareSize()"); const a = await fetchRecursiveBlockOutputTotals(e), r = await getBlockTransactionCount(e); if (a.length !== r)
-    throw new Error("Mondrian transaction count mismatch for block " + e + ": raw-block=" + a.length + ", blockinfo=" + r); const n = validateMondrianPattern(a.map(e => t.getSquareSize(e)), e); return { pattern: n, values: a, source: "recursive-raw-block" }; }
-async function resolveBitmapPattern(e, { forceLive: t = !1, allowLiveFallback: a = !0 } = {}) { checkBitmapNumber(e); const r = await storageGetMondrianSafe(e); if (!t && Array.isArray(r?.pattern) && r.pattern.length > 0)
-    return { pattern: validateMondrianPattern(r.pattern, e), source: r.patternSource ?? r.source ?? "indexeddb", cacheSource: "indexeddb", mondrianModule: await loadMondrianModule() }; const n = await loadMondrianModule(); if (!t && "function" == typeof n?.getPatternArray) {
-    const t = validateMondrianPattern(n.getPatternArray(e), e);
-    if (t) {
-        const a = await getBlockTransactionCount(e);
-        if (t.length !== a)
-            throw new Error("Indexed Mondrian transaction count mismatch for block " + e + ": pattern=" + t.length + ", blockinfo=" + a);
-        return { pattern: t, source: "on-chain-pattern-index", mondrianModule: n };
+// Optional timing callbacks record real browser stages without adding requests.
+function mondrianNow() {
+    return "undefined" != typeof performance && "function" == typeof performance.now ? performance.now() : Date.now();
+}
+function reportMondrianStage(onTiming, stage, started, detail = {}) {
+    if ("function" != typeof onTiming) return;
+    try {
+        onTiming({ stage, ms: Math.round((mondrianNow() - started) * 100) / 100, ...detail });
+    } catch {
+        // Observability must never change canonical geometry behaviour.
     }
-} if (!a)
-    throw new Error("No indexed Mondrian pattern is available for block " + e); return { ...await fetchLiveMondrianPattern(e, n), mondrianModule: n }; }
+}
+async function fetchRecursiveBlockOutputTotals(height, onTiming = null) {
+    checkBitmapNumber(height);
+    let started = mondrianNow();
+    const response = await fetchWithTimeout("/r/block/" + height);
+    reportMondrianStage(onTiming, "raw-block-http", started, { height });
+    if (!response.ok)
+        throw new Error("/r/block/" + height + " returned HTTP " + response.status);
+    started = mondrianNow();
+    const hex = await response.json();
+    reportMondrianStage(onTiming, "raw-block-json", started, { height, hexChars: "string" == typeof hex ? hex.length : null });
+    started = mondrianNow();
+    const totals = parseRawBlockOutputTotals(hex, height, onTiming);
+    reportMondrianStage(onTiming, "raw-block-transaction-parser", started, { height, transactions: totals.length });
+    return totals;
+}
+async function fetchLiveMondrianPattern(height, mondrian, onTiming = null) {
+    if ("function" != typeof mondrian?.getSquareSize)
+        throw new Error("Mondrian module does not export getSquareSize()");
+    // Block info is independent of the raw block, so fetch concurrently.
+    const totalsPromise = fetchRecursiveBlockOutputTotals(height, onTiming);
+    const blockInfoPromise = (async () => {
+        const started = mondrianNow();
+        const count = await getBlockTransactionCount(height);
+        reportMondrianStage(onTiming, "block-transaction-count", started, { height, transactions: count });
+        return count;
+    })();
+    const [totals, txCount] = await Promise.all([totalsPromise, blockInfoPromise]);
+    if (totals.length !== txCount)
+        throw new Error("Mondrian transaction count mismatch for block " + height + ": raw-block=" + totals.length + ", blockinfo=" + txCount);
+    const started = mondrianNow();
+    const pattern = validateMondrianPattern(totals.map(total => mondrian.getSquareSize(total)), height);
+    reportMondrianStage(onTiming, "pattern-derivation", started, { height, transactions: totals.length });
+    return { pattern, values: totals, source: "recursive-raw-block" };
+}
+async function resolveBitmapPattern(height, {
+    forceLive = false, allowLiveFallback = true, onTiming = null, cachedRecord = undefined
+} = {}) {
+    checkBitmapNumber(height);
+    // Reuse the IndexedDB record the geometry caller already read.
+    const record = forceLive ? null :
+        cachedRecord === undefined ? await storageGetMondrianSafe(height) : cachedRecord;
+    if (!forceLive && Array.isArray(record?.pattern) && record.pattern.length > 0) {
+        const source = record.patternSource ?? record.source ?? "indexeddb";
+        const compactBacked = source === "verified-compact-pattern-cache";
+        let current = !compactBacked;
+        if (compactBacked && record.blockHash) {
+            try { current = record.blockHash === await getBlockHash(height); }
+            catch { current = false; }
+        }
+        if (current) return {
+            pattern: validateMondrianPattern(record.pattern, height),
+            source, cacheSource: "indexeddb",
+            ...(compactBacked ? { blockHash: record.blockHash } : {}),
+            mondrianModule: await loadMondrianModule()
+        };
+    }
+    if (!forceLive) {
+        const compact = await loadVerifiedCompactPattern(height);
+        if (compact) return { ...compact, mondrianModule: await loadMondrianModule() };
+    }
+    const moduleStarted = mondrianNow();
+    const mondrian = await loadMondrianModule();
+    reportMondrianStage(onTiming, "mondrian-module", moduleStarted, { height });
+    if (!forceLive && "function" == typeof mondrian?.getPatternArray) {
+        const indexedPattern = validateMondrianPattern(mondrian.getPatternArray(height), height);
+        if (indexedPattern) {
+            const indexedCountStarted = mondrianNow();
+            const count = await getBlockTransactionCount(height);
+            reportMondrianStage(onTiming, "block-transaction-count", indexedCountStarted, { height, transactions: count });
+            if (indexedPattern.length !== count)
+                throw new Error("Indexed Mondrian transaction count mismatch for block " + height + ": pattern=" + indexedPattern.length + ", blockinfo=" + count);
+            return { pattern: indexedPattern, source: "on-chain-pattern-index", mondrianModule: mondrian };
+        }
+    }
+    if (!allowLiveFallback)
+        throw new Error("No indexed Mondrian pattern is available for block " + height);
+    return { ...await fetchLiveMondrianPattern(height, mondrian, onTiming), mondrianModule: mondrian };
+}
 export async function getBitmapPattern(e, t = {}) { return (await resolveBitmapPattern(e, t)).pattern.slice(); }
 export async function getBitmapPatternInfo(e, t = {}) { const { pattern: a, source: r, cacheSource: n = null } = await resolveBitmapPattern(e, t); return { bitmapNumber: e, pattern: a.slice(), source: r, indexed: "on-chain-pattern-index" === r, cached: "indexeddb" === n }; }
-export async function getBitmapMondrian(e, { includeEmptySpaces: t = !1, includeClaims: a = !1, includeValues: v = !1, forceRefresh: r = !1, forceLive: n = !1, allowLiveFallback: i = !0, persist: o = !0 } = {}) { checkBitmapNumber(e); const s = [e, t ? 1 : 0, a ? 1 : 0, v ? 1 : 0, n ? 1 : 0, i ? 1 : 0].join(":"); if (!a && !r && !v) {
-    const t = await storageGetMondrianSafe(e);
-    if (t?.slots)
-        return storedMondrianToPublic(t);
-    if (mondrianCache.has(s))
-        return mondrianCache.get(s);
-} const { pattern: c, values: k = null, source: l, cacheSource: q = null, mondrianModule: u } = await resolveBitmapPattern(e, { forceLive: n, allowLiveFallback: i }); if ("function" != typeof u?.MondrianLayout)
-    throw new Error("Mondrian module does not export MondrianLayout"); let w = null; if (v) {
-    w = Array.isArray(k) ? k : await fetchRecursiveBlockOutputTotals(e);
-    if (w.length !== c.length)
-        throw new Error("Mondrian transaction value count mismatch for block " + e + ": values=" + w.length + ", pattern=" + c.length);
-} const d = new u.MondrianLayout(c), p = "function" == typeof d.getSize ? d.getSize() : { width: d.width, height: d.height }; if (!Number.isFinite(p?.width) || !Number.isFinite(p?.height) || !Array.isArray(d?.slots))
-    throw new Error("Mondrian module returned an invalid layout"); let m = null, h = null; if (a && (h = await validateBitmap(e, { forceRefresh: !1, persist: o }), m = new Map, h.valid)) {
-    const t = await getBitmapParcels(e, { forceRefresh: r, requireCurrent: !0, persist: o });
-    for (const e of t.validParcels || [])
-        m.set(e.parcelNumber, e);
-} const b = d.slots.map((t, r) => { const n = m?.get(r) || null; return { parcelNumber: r, name: r + "." + e + ".bitmap", x: t.position.x, y: t.position.y, size: t.size, ...v ? { valueSats: w?.[r] ?? null } : {}, ...a ? { claimed: Boolean(n), inscriptionId: n?.id ?? null } : {} }; }), g = t ? d.fillEmptySpaces(!0).map(e => ({ x: e.position.x, y: e.position.y, size: e.size })) : void 0, f = { bitmapNumber: e, source: l, patternSource: l, indexed: "on-chain-pattern-index" === l, cacheSource: q, transactionCount: c.length, pattern: c.slice(), width: p.width, height: p.height, length: Number.isFinite(d.length) ? d.length : null, slots: b, ...t ? { emptySpaces: g } : {}, ...a ? { bitmapClaimed: Boolean(h?.valid), bitmapInscriptionId: h?.inscriptionId ?? null } : {} }; return o && !a && !v && await persistMondrian(f), a || mondrianCache.set(s, f), f; }
+
+// === Optional compact Mondrian pattern transport =================================
+// This is a derived-data format. SHA-256 checks integrity, not Bitcoin provenance.
+// Only a manifest verified against /r/block/<height> can enter the trusted cache.
+const COMPACT_PATTERN_FORMAT = "bitmap-mondrian-compact-pattern-v1";
+const MAX_COMPACT_TRANSACTIONS = 100000;
+const MAX_COMPACT_PAYLOAD_BYTES = 64000;
+
+export function packBitmapPattern(pattern) {
+    const values = validateMondrianPattern(pattern, "compact manifest");
+    if (!values || values.length > MAX_COMPACT_TRANSACTIONS)
+        throw new TypeError("Invalid compact Mondrian transaction count");
+    const bytes = new Uint8Array(Math.ceil(values.length / 2));
+    for (let i = 0; i < values.length; i++)
+        bytes[i >> 1] |= values[i] << (0 === i % 2 ? 4 : 0);
+    return bytes;
+}
+export function unpackBitmapPattern(bytes, count) {
+    if (!(bytes instanceof Uint8Array) || !Number.isSafeInteger(count) ||
+        count < 1 || count > MAX_COMPACT_TRANSACTIONS ||
+        bytes.length !== Math.ceil(count / 2))
+        throw new TypeError("Invalid packed Mondrian pattern length");
+    if (count % 2 && (bytes[bytes.length - 1] & 15))
+        throw new Error("Nonzero trailing nibble in compact Mondrian pattern");
+    const pattern = new Array(count);
+    for (let i = 0; i < count; i++) {
+        const size = (bytes[i >> 1] >> (0 === i % 2 ? 4 : 0)) & 15;
+        if (size < 1 || size > 9)
+            throw new Error("Invalid compact Mondrian square size at " + i);
+        pattern[i] = size;
+    }
+    return pattern;
+}
+function compactBase64ToBytes(encoded) {
+    if ("string" != typeof encoded || encoded.length > 4 * Math.ceil(MAX_COMPACT_PAYLOAD_BYTES / 3) + 4 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
+        throw new Error("Invalid compact Mondrian Base64");
+    const binary = atob(encoded);
+    if (binary.length > MAX_COMPACT_PAYLOAD_BYTES)
+        throw new Error("Compact Mondrian payload exceeds size limit");
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+function compactBytesToBase64(bytes) {
+    let out = "";
+    for (let i = 0; i < bytes.length; i += 8192)
+        out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return btoa(out);
+}
+async function compactSha256(bytes) {
+    if (!globalThis.crypto?.subtle)
+        throw new Error("WebCrypto SHA-256 is required to verify compact Mondrian data");
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
+    return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+// Existing, inscribed BrotliOC IIFE from Nexus Inscriber. It exports its API
+// as globalThis.BrotliOC, not through JavaScript module exports.
+// Use only same-origin Ord recursive content, never a remote CDN.
+export const BROTLI_OC_INSCRIPTION_ID = "fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0";
+// The separate classic-script decoder is also supported when already loaded
+// by the host HTML as globalThis.BrotliDecode.
+export const BROTLI_DECODE_INSCRIPTION_ID = "b1d16a7a1ada08b5c7f51837478f578c0abd0973809c439228f28ccd5c38e44ai0";
+let compactBrotliOCInit = null;
+async function loadCompactBrotliOC() {
+    const present = globalThis.BrotliOC;
+    if (present && "function" === typeof present.compress &&
+        "function" === typeof present.decompress) return present;
+    if (!compactBrotliOCInit)
+        compactBrotliOCInit = (async () => {
+            await import("/content/" + BROTLI_OC_INSCRIPTION_ID);
+            const loaded = globalThis.BrotliOC;
+            if (!loaded || "function" !== typeof loaded.compress ||
+                "function" !== typeof loaded.decompress)
+                throw new Error("On-chain BrotliOC missing compress/decompress API");
+            return loaded;
+        })().catch(error => {
+            compactBrotliOCInit = null;
+            throw error;
+        });
+    return compactBrotliOCInit;
+}
+function normaliseCompactByteArray(value) {
+    if (value instanceof Uint8Array) return value;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+    if (value && value.buffer instanceof ArrayBuffer &&
+        Number.isSafeInteger(value.byteLength) && value.byteLength >= 0)
+        return new Uint8Array(value.buffer, value.byteOffset || 0, value.byteLength);
+    throw new TypeError("On-chain Brotli codec must return bytes");
+}
+async function onChainCompactBrotli(bytes, compress) {
+    // Existing HTML inscriptions sometimes preload the original BrotliDecode
+    // as a classic script. Use it without introducing another dependency.
+    if (!compress && "function" === typeof globalThis.BrotliDecode)
+        return normaliseCompactByteArray(await globalThis.BrotliDecode(bytes));
+    const codec = await loadCompactBrotliOC();
+    return normaliseCompactByteArray(compress ?
+        await codec.compress(bytes, { quality: 11 }) :
+        await codec.decompress(bytes));
+}
+async function compactCodec(bytes, format, compress, brotliDecoder = null) {
+    if ("none" === format) return bytes;
+    if (format !== "gzip" && format !== "brotli")
+        throw new Error("Unsupported compact Mondrian compression: " + format);
+    // Caller-provided on-chain Brotli decoding is explicit and takes priority:
+    // browsers with native Brotli support must behave exactly the same.
+    if (!compress && format === "brotli" && "function" === typeof brotliDecoder) {
+        const decoded = await brotliDecoder(bytes);
+        if (!(decoded instanceof Uint8Array))
+            throw new TypeError("Brotli decoder must return Uint8Array");
+        if (decoded.length > Math.ceil(MAX_COMPACT_TRANSACTIONS / 2))
+            throw new Error("Compact Mondrian Brotli output exceeds limit");
+        return decoded;
+    }
+    const type = compress ? globalThis.CompressionStream : globalThis.DecompressionStream;
+    const nativeFormat = format;
+    let codec = null;
+    try {
+        if ("function" === typeof type) codec = new type(nativeFormat);
+    } catch { }
+    if (!codec) {
+        if (format === "brotli") {
+            // Native decompression is preferable. If it is unavailable, use
+            // the already-inscribed decoder/encoder with the same-origin path.
+            const out = await onChainCompactBrotli(bytes, compress);
+            const maximum = compress ? MAX_COMPACT_PAYLOAD_BYTES :
+                Math.ceil(MAX_COMPACT_TRANSACTIONS / 2);
+            if (out.length > maximum)
+                throw new Error("On-chain Brotli codec output exceeds limit");
+            return out;
+        }
+        throw new Error("Native gzip " + (compress ? "compression" : "decompression") +
+            " unavailable in this browser");
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(codec);
+    const reader = stream.getReader();
+    const maxBytes = compress ? MAX_COMPACT_PAYLOAD_BYTES : Math.ceil(MAX_COMPACT_TRANSACTIONS / 2);
+    const chunks = [];
+    let count = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            count += value.length;
+            if (count > maxBytes) {
+                await reader.cancel();
+                throw new Error("Compact Mondrian codec output exceeds limit");
+            }
+            chunks.push(value);
+        }
+    } finally {
+        try { reader.releaseLock(); } catch { }
+    }
+    const result = new Uint8Array(count);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return result;
+}
+export async function decodeBitmapPatternManifest(manifest, { brotliDecoder = null } = {}) {
+    if (!manifest || manifest.format !== COMPACT_PATTERN_FORMAT ||
+        !Number.isSafeInteger(manifest.height) || manifest.height < 0 ||
+        !Number.isSafeInteger(manifest.transactionCount) ||
+        manifest.transactionCount < 1 || manifest.transactionCount > MAX_COMPACT_TRANSACTIONS ||
+        manifest.nibbleOrder !== "high-first" ||
+        manifest.padding !== "zero-low-nibble-if-odd" ||
+        !/^[0-9a-f]{64}$/i.test(manifest.blockHash || "") ||
+        !/^[0-9a-f]{64}$/i.test(manifest.packedSha256 || "") ||
+        manifest.packedByteLength !== Math.ceil(manifest.transactionCount / 2) ||
+        !["none", "gzip", "brotli"].includes(manifest.compression))
+        throw new Error("Invalid compact Mondrian manifest metadata");
+    const payload = compactBase64ToBytes(manifest.payloadBase64);
+    if (manifest.encodedBytes !== payload.length)
+        throw new Error("Compact Mondrian encoded byte length mismatch");
+    const packed = await compactCodec(payload, manifest.compression, false, brotliDecoder);
+    if (packed.length !== manifest.packedByteLength)
+        throw new Error("Compact Mondrian unpacked byte length mismatch");
+    const digest = await compactSha256(packed);
+    if (digest !== manifest.packedSha256.toLowerCase())
+        throw new Error("Compact Mondrian SHA-256 mismatch");
+    const pattern = unpackBitmapPattern(packed, manifest.transactionCount);
+    return {
+        height: manifest.height, blockHash: manifest.blockHash.toLowerCase(),
+        pattern, packedSha256: digest, compression: manifest.compression,
+        integrityVerified: true, verifiedAgainstRawBlock: false
+    };
+}
+export async function getBitmapPatternManifest(height, {
+    compression = "auto", forceLive = true
+} = {}) {
+    checkBitmapNumber(height);
+    if (!["auto", "none", "gzip", "brotli"].includes(compression))
+        throw new TypeError("Invalid compact pattern compression");
+    // Explicit generation uses canonical raw Bitcoin data by default.
+    const before = await getBlockHash(height);
+    const resolved = await resolveBitmapPattern(height, { forceLive });
+    const after = await getBlockHash(height);
+    if (before !== after) throw new Error("Bitmap block hash changed while exporting pattern");
+    const packed = packBitmapPattern(resolved.pattern);
+    const packedSha256 = await compactSha256(packed);
+    let format = compression, payload = packed;
+    if (compression === "auto") {
+        for (const candidate of ["brotli", "gzip"]) {
+            try {
+                payload = await compactCodec(packed, candidate, true);
+                format = candidate;
+                break;
+            } catch { }
+        }
+        if (format === "auto") format = "none";
+    } else {
+        payload = await compactCodec(packed, compression, true);
+    }
+    return {
+        format: COMPACT_PATTERN_FORMAT, height, blockHash: after,
+        transactionCount: resolved.pattern.length, nibbleOrder: "high-first",
+        padding: "zero-low-nibble-if-odd", packedByteLength: packed.length,
+        packedSha256, compression: format, encodedBytes: payload.length,
+        payloadBase64: compactBytesToBase64(payload),
+        source: resolved.source,
+        verifiedAgainstRawBlock: forceLive && resolved.source === "recursive-raw-block"
+    };
+}
+async function buildMondrianGeometryFromPattern(height, pattern, {
+    includeEmptySpaces = false, source = "supplied-compact-manifest"
+} = {}) {
+    checkBitmapNumber(height);
+    const sizes = validateMondrianPattern(pattern, height);
+    if (!sizes || sizes.length > MAX_COMPACT_TRANSACTIONS)
+        throw new Error("Invalid compact Mondrian pattern");
+    const module = await loadMondrianModule();
+    const layout = new module.MondrianLayout(sizes);
+    const dimensions = "function" === typeof layout.getSize
+        ? layout.getSize() : { width: layout.width, height: layout.height };
+    if (!Array.isArray(layout.slots) || layout.slots.length !== sizes.length ||
+        !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.height))
+        throw new Error("Invalid compact Mondrian geometry");
+    return {
+        bitmapNumber: height, source, patternSource: source,
+        indexed: false, transactionCount: sizes.length, pattern: sizes.slice(),
+        width: dimensions.width, height: dimensions.height,
+        length: Number.isFinite(layout.length) ? layout.length : null,
+        slots: layout.slots.map((slot, ordinal) => ({
+            parcelNumber: ordinal, name: ordinal + "." + height + ".bitmap",
+            x: slot.position.x, y: slot.position.y, size: slot.size
+        })),
+        ...includeEmptySpaces ? { emptySpaces: layout.fillEmptySpaces(true).map(slot => ({
+            x: slot.position.x, y: slot.position.y, size: slot.size
+        })) } : {}
+    };
+}
+export async function getBitmapGeometryFromPattern(height, pattern, options = {}) {
+    return await buildMondrianGeometryFromPattern(height, pattern, options);
+}
+export async function getBitmapGeometryFromManifest(manifest, {
+    includeEmptySpaces = false, brotliDecoder = null, verifyAgainstRawBlock = false
+} = {}) {
+    const decoded = await decodeBitmapPatternManifest(manifest, { brotliDecoder });
+    let verifiedAgainstRawBlock = false;
+    if (verifyAgainstRawBlock) {
+        const before = await getBlockHash(decoded.height);
+        if (before !== decoded.blockHash)
+            throw new Error("Compact Mondrian block hash does not match chain");
+        const actual = await resolveBitmapPattern(decoded.height, { forceLive: true });
+        const after = await getBlockHash(decoded.height);
+        if (before !== after || actual.pattern.length !== decoded.pattern.length ||
+            actual.pattern.some((size, index) => size !== decoded.pattern[index]))
+            throw new Error("Compact Mondrian pattern does not match raw Bitcoin block");
+        verifiedAgainstRawBlock = true;
+    }
+    const result = await buildMondrianGeometryFromPattern(decoded.height, decoded.pattern, {
+        includeEmptySpaces, source: verifiedAgainstRawBlock ?
+            "verified-compact-manifest" : "unverified-compact-manifest"
+    });
+    return { ...result, integrityVerified: true, verifiedAgainstRawBlock };
+}
+async function storageGetCompactPatternSafe(height) {
+    if (!indexedDbAvailable()) return null;
+    try {
+        await initialiseStorage();
+        const record = currentStoredRecord(await idbGet("mondrianPatterns", height));
+        return record?.verifiedAgainstRawBlock === true ? record : null;
+    } catch { return null; }
+}
+async function persistCompactPattern(height, blockHash, pattern, packedSha256) {
+    if (!indexedDbAvailable()) return false;
+    await initialiseStorage();
+    const packedBytes = packBitmapPattern(pattern);
+    const success = await idbPut("mondrianPatterns", {
+        height, blockHash, packedBytes, packedSha256,
+        transactionCount: pattern.length, verifiedAgainstRawBlock: true,
+        source: "recursive-raw-block", storedAt: Date.now(),
+        protocolVersion: STORAGE_PROTOCOL_VERSION
+    });
+    if (success) notifyStorageSubscribers({ type: "mondrian-pattern", height });
+    return success;
+}
+async function loadVerifiedCompactPattern(height) {
+    const record = await storageGetCompactPatternSafe(height);
+    if (!record || !/^[0-9a-f]{64}$/.test(record.blockHash) ||
+        !(record.packedBytes instanceof Uint8Array)) return null;
+    try {
+        const hash = await getBlockHash(height);
+        if (hash !== record.blockHash) return null;
+        if (await compactSha256(record.packedBytes) !== record.packedSha256) return null;
+        const pattern = unpackBitmapPattern(record.packedBytes, record.transactionCount);
+        return { pattern, source: "verified-compact-pattern-cache", cacheSource: "indexeddb", blockHash: hash };
+    } catch { return null; }
+}
+export async function cacheBitmapPatternManifest(manifest, {
+    brotliDecoder = null, verifyAgainstRawBlock = true
+} = {}) {
+    if (!verifyAgainstRawBlock)
+        throw new Error("Unverified compact Mondrian manifests cannot enter the trusted cache");
+    const decoded = await decodeBitmapPatternManifest(manifest, { brotliDecoder });
+    const before = await getBlockHash(decoded.height);
+    if (before !== decoded.blockHash)
+        throw new Error("Compact Mondrian block hash does not match chain");
+    const raw = await resolveBitmapPattern(decoded.height, { forceLive: true });
+    const after = await getBlockHash(decoded.height);
+    if (after !== before || raw.pattern.length !== decoded.pattern.length ||
+        raw.pattern.some((size, index) => size !== decoded.pattern[index]))
+        throw new Error("Compact Mondrian pattern does not match raw Bitcoin block");
+    const persisted = await persistCompactPattern(
+        decoded.height, before, decoded.pattern, decoded.packedSha256
+    );
+    return {
+        bitmapNumber: decoded.height, verifiedAgainstRawBlock: true,
+        cached: persisted, packedByteLength: Math.ceil(decoded.pattern.length / 2)
+    };
+}
+// ================================================================================
+
+export async function getBitmapMondrian(bitmapNumber, {
+    includeEmptySpaces = false, includeClaims = false, includeValues = false,
+    forceRefresh = false, forceLive = false, allowLiveFallback = true,
+    persist = true, onTiming = null
+} = {}) {
+    checkBitmapNumber(bitmapNumber);
+    if (onTiming !== null && typeof onTiming !== "function")
+        throw new TypeError("onTiming must be a function or null");
+    const totalStarted = mondrianNow();
+    const key = [bitmapNumber, includeEmptySpaces ? 1 : 0, includeClaims ? 1 : 0,
+        includeValues ? 1 : 0, forceLive ? 1 : 0, allowLiveFallback ? 1 : 0].join(":");
+    let cachedRecord = undefined;
+    let staleCompactGeometry = false;
+    if (!includeClaims && !forceRefresh && !includeValues && !forceLive) {
+        const cacheReadStarted = mondrianNow();
+        cachedRecord = await storageGetMondrianSafe(bitmapNumber);
+        reportMondrianStage(onTiming, "indexeddb-read", cacheReadStarted, { bitmapNumber });
+        if ((cachedRecord?.patternSource ?? cachedRecord?.source) === "verified-compact-pattern-cache") {
+            try {
+                staleCompactGeometry = !cachedRecord.blockHash ||
+                    (await getBlockHash(bitmapNumber)) !== cachedRecord.blockHash;
+            } catch { staleCompactGeometry = true; }
+            if (staleCompactGeometry) cachedRecord = null;
+        }
+        if (Array.isArray(cachedRecord?.slots) &&
+            (!includeEmptySpaces || Array.isArray(cachedRecord.emptySpaces))) {
+            const result = storedMondrianToPublic(cachedRecord);
+            reportMondrianStage(onTiming, "total", totalStarted, {
+                bitmapNumber, source: "indexeddb", cacheHit: true, slots: result.slots.length
+            });
+            return result;
+        }
+        if (!staleCompactGeometry && mondrianCache.has(key)) {
+            const result = mondrianCache.get(key);
+            reportMondrianStage(onTiming, "total", totalStarted, {
+                bitmapNumber, source: "memory", cacheHit: true, slots: result.slots.length
+            });
+            return result;
+        }
+    }
+    const patternStarted = mondrianNow();
+    const { pattern, values = null, source, cacheSource = null, mondrianModule, blockHash: resolvedBlockHash = null } =
+        await resolveBitmapPattern(bitmapNumber, {
+            forceLive, allowLiveFallback, onTiming, cachedRecord
+        });
+    reportMondrianStage(onTiming, "pattern-resolution", patternStarted, {
+        bitmapNumber, source, transactions: pattern.length
+    });
+    if ("function" != typeof mondrianModule?.MondrianLayout)
+        throw new Error("Mondrian module does not export MondrianLayout");
+    let valueTotals = null;
+    if (includeValues) {
+        valueTotals = Array.isArray(values)
+            ? values : await fetchRecursiveBlockOutputTotals(bitmapNumber, onTiming);
+        if (valueTotals.length !== pattern.length)
+            throw new Error("Mondrian transaction value count mismatch for block " +
+                bitmapNumber + ": values=" + valueTotals.length + ", pattern=" + pattern.length);
+    }
+    let started = mondrianNow();
+    const layout = new mondrianModule.MondrianLayout(pattern);
+    const dimensions = "function" == typeof layout.getSize
+        ? layout.getSize() : { width: layout.width, height: layout.height };
+    if (!Number.isFinite(dimensions?.width) || !Number.isFinite(dimensions?.height) ||
+        !Array.isArray(layout?.slots))
+        throw new Error("Mondrian module returned an invalid layout");
+    reportMondrianStage(onTiming, "layout-construction", started, {
+        bitmapNumber, slots: layout.slots.length
+    });
+    let claimMap = null, bitmap = null;
+    if (includeClaims) {
+        started = mondrianNow();
+        bitmap = await validateBitmap(bitmapNumber, { forceRefresh: false, persist });
+        claimMap = new Map();
+        if (bitmap.valid) {
+            const parcels = await getBitmapParcels(bitmapNumber, {
+                forceRefresh, requireCurrent: true, persist
+            });
+            for (const parcel of parcels.validParcels || [])
+                claimMap.set(parcel.parcelNumber, parcel);
+        }
+        reportMondrianStage(onTiming, "claim-resolution", started, {
+            bitmapNumber, claims: claimMap.size
+        });
+    }
+    started = mondrianNow();
+    const slots = layout.slots.map((slot, ordinal) => {
+        const claim = claimMap?.get(ordinal) || null;
+        return {
+            parcelNumber: ordinal, name: ordinal + "." + bitmapNumber + ".bitmap",
+            x: slot.position.x, y: slot.position.y, size: slot.size,
+            ...includeValues ? { valueSats: valueTotals?.[ordinal] ?? null } : {},
+            ...includeClaims ? { claimed: Boolean(claim), inscriptionId: claim?.id ?? null } : {}
+        };
+    });
+    reportMondrianStage(onTiming, "slot-mapping", started, {
+        bitmapNumber, slots: slots.length
+    });
+    let gaps;
+    if (includeEmptySpaces) {
+        started = mondrianNow();
+        gaps = layout.fillEmptySpaces(true).map(slot => ({
+            x: slot.position.x, y: slot.position.y, size: slot.size
+        }));
+        reportMondrianStage(onTiming, "empty-space-construction", started, {
+            bitmapNumber, emptySpaces: gaps.length
+        });
+    }
+    const result = {
+        bitmapNumber, source, patternSource: source,
+        ...(resolvedBlockHash ? { blockHash: resolvedBlockHash } : {}),
+        indexed: source === "on-chain-pattern-index", cacheSource,
+        transactionCount: pattern.length, pattern: pattern.slice(),
+        width: dimensions.width, height: dimensions.height,
+        length: Number.isFinite(layout.length) ? layout.length : null,
+        slots,
+        ...includeEmptySpaces ? { emptySpaces: gaps } : {},
+        ...includeClaims ? { bitmapClaimed: Boolean(bitmap?.valid),
+            bitmapInscriptionId: bitmap?.inscriptionId ?? null } : {}
+    };
+    if (persist && !includeClaims && !includeValues) {
+        started = mondrianNow();
+        await persistMondrian(result);
+        reportMondrianStage(onTiming, "indexeddb-persist", started, { bitmapNumber });
+    }
+    if (!includeClaims)
+        mondrianCache.set(key, result);
+    reportMondrianStage(onTiming, "total", totalStarted, {
+        bitmapNumber, source, cacheHit: false, slots: slots.length
+    });
+    return result;
+}
 function treeNodeFromInfo(e, t, a = null) { return { id: e, depth: a, height: normaliseHeight(t), number: t?.number ?? null, sat: t?.sat ?? null, address: t?.address ?? null, output: t?.output ?? null, satpoint: t?.satpoint ?? null, timestamp: t?.timestamp ?? null, charms: Array.isArray(t?.charms) ? [...t.charms] : [] }; }
 function buildNestedTree(e, t, a) { const r = new Map(t.map(e => [e.id, e])), n = new Map, i = new Map; for (const e of a)
     "parent-child" === e.type && (n.has(e.from) || n.set(e.from, []), n.get(e.from).push(e.to), i.set(e.to, (i.get(e.to) || 0) + 1)); const o = new Set; return function t(a, s = new Set) { const c = r.get(a) || { id: a }; if (s.has(a))
@@ -888,7 +1615,7 @@ catch {
     return !1;
 } }
 async function persistProcessedBlock(e, t, a) { await idbPut("blockHashes", { height: e, hash: t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), await Promise.all([setMetaValue("watch:lastProcessedHeight", e), setMetaValue("watch:lastProcessedHash", t), setMetaValue("watch:coverageStartHeight", a)]); }
-async function scanBlockInternal(e, { validate: t = !0, includeNonCanonical: a = !1, validationConcurrency: r = 4, persist: n = !0, continuous: i = !1, coverageStartHeight: o = null, resolveEncodedParcelCandidates: v = !1 } = {}) { checkBitmapNumber(e); const [s, c] = await Promise.all([getBlockHashWithRetry(e), getParsedBlockInscriptionsWithRetry(e)]), l = [], u = [], k = []; await mapWithConcurrency(c, r, async (t) => { const a = strictClaimText(t), r = parseBitmapName(a); if (r)
+async function scanBlockInternal(e, { validate: t = !0, includeNonCanonical: a = !1, validationConcurrency: r = 4, persist: n = !0, continuous: i = !1, coverageStartHeight: o = null, resolveEncodedParcelCandidates: v = !1 } = {}) { checkBitmapNumber(e); const [s, c] = await Promise.all([getBlockHashWithRetry(e), getParsedBlockInscriptionsWithRetry(e)]), l = [], u = [], k = []; if (n) await persistParsedBitmapBlock(e, s, c); await mapWithConcurrency(c, r, async (t) => { const a = strictClaimText(t), r = parseBitmapName(a); if (r)
     return void l.push({ id: t.id, height: e, content: a, bitmapNumber: r.bitmapNumber, eligibleHeight: r.bitmapNumber <= e }); let n = parseParcelName(a); if (!n && (hasContentEncoding(t) || hasDelegate(t))) {
     if (!v)
         return void k.push({ id: t.id, height: e });
@@ -931,8 +1658,12 @@ function deleteByHeightIndex(e, t, a) { const r = e.index(t).openKeyCursor(IDBKe
 function deleteByPrimaryKeyRange(e, t) { const a = e.openKeyCursor(IDBKeyRange.lowerBound(t)); a.onsuccess = () => { const t = a.result; t && (e.delete(t.primaryKey), t.continue()); }; }
 async function rollbackStorageFromHeight(e) { if (!indexedDbAvailable())
     return !1; checkBitmapNumber(e), await initialiseStorage(); const t = await openStorageDb(); if (!t)
-    return !1; return await new Promise((a, r) => { const n = t.transaction(["bitmaps", "parcels", "parcelClaims", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "bitmapSearch", "meta"], "readwrite"); deleteByHeightIndex(n.objectStore("bitmaps"), "height", e), deleteByHeightIndex(n.objectStore("parcels"), "height", e), deleteByHeightIndex(n.objectStore("parcelClaims"), "height", e), deleteByPrimaryKeyRange(n.objectStore("mondrians"), e), deleteByPrimaryKeyRange(n.objectStore("blockHashes"), e), n.objectStore("childTrees").clear(), n.objectStore("satChains").clear(), n.objectStore("bitmapSearch").clear(); const i = n.objectStore("bitmapState").openCursor(); i.onsuccess = () => { const t = i.result; if (!t)
-    return; const a = t.value; Number.isSafeInteger(a?.childrenScannedThroughHeight) && a.childrenScannedThroughHeight >= e && (a.childrenScannedThroughHeight = e - 1, a.syncedAt = Date.now(), t.update(a)), t.continue(); }, n.objectStore("meta").put({ key: "watch:lastProcessedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.objectStore("meta").put({ key: "watch:lastProcessedHash", value: null, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.oncomplete = () => a(!0), n.onerror = () => r(n.error), n.onabort = () => r(n.error); }), clearCaches(), notifyStorageSubscribers({ type: "reorg-rollback", rewindHeight: e }), !0; }
+    return !1; return await new Promise((a, r) => { const n = t.transaction(["bitmaps", "parcels", "parcelClaims", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "bitmapSearch", "bitmapBlockIndex", "meta"], "readwrite"); deleteByHeightIndex(n.objectStore("bitmaps"), "height", e), deleteByHeightIndex(n.objectStore("parcels"), "height", e), deleteByHeightIndex(n.objectStore("parcelClaims"), "height", e), deleteByPrimaryKeyRange(n.objectStore("mondrians"), e), deleteByPrimaryKeyRange(n.objectStore("blockHashes"), e), deleteByPrimaryKeyRange(n.objectStore("bitmapBlockIndex"), e), n.objectStore("childTrees").clear(), n.objectStore("satChains").clear(), n.objectStore("bitmapSearch").clear(); const i = n.objectStore("bitmapState").openCursor(); i.onsuccess = () => { const t = i.result; if (!t)
+    return; const a = t.value; Number.isSafeInteger(a?.childrenScannedThroughHeight) && a.childrenScannedThroughHeight >= e && (a.childrenScannedThroughHeight = e - 1, a.syncedAt = Date.now(), t.update(a)), t.continue(); }, (n.objectStore("meta").get("bitmapIndex:lastScannedHeight").onsuccess = function () {
+    const prior = this.result?.value;
+    if (Number.isSafeInteger(prior) && prior >= e)
+        n.objectStore("meta").put({ key: "bitmapIndex:lastScannedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() });
+}), n.objectStore("meta").put({ key: "watch:lastProcessedHeight", value: e - 1, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.objectStore("meta").put({ key: "watch:lastProcessedHash", value: null, protocolVersion: STORAGE_PROTOCOL_VERSION, updatedAt: Date.now() }), n.oncomplete = () => a(!0), n.onerror = () => r(n.error), n.onabort = () => r(n.error); }), clearCaches(), notifyStorageSubscribers({ type: "reorg-rollback", rewindHeight: e }), !0; }
 async function findReorgRewindHeight(e, t) { const a = Math.max(0, e - t); for (let t = e; t >= a; t--) {
     const e = currentStoredRecord(await idbGet("blockHashes", t));
     if (e?.hash)
@@ -994,14 +1725,14 @@ catch (e) {
 catch (e) {
     y.lastError = e?.message || String(e), await I({ type: "error", error: e, message: y.lastError, lastProcessedHeight: f });
 } return y; }().finally(() => { b = null; }), b); } function C() { m || (h = setTimeout(async () => { await S(), C(); }, t)); } function N() { m || (m = !0, y.running = !1, null !== h && (clearTimeout(h), h = null), s && v && s.removeEventListener("abort", v)); } const v = () => N(); s && (s.aborted ? N() : s.addEventListener("abort", v, { once: !0 })); const P = S().finally(() => { m || C(); }); return Object.freeze({ stop: N, checkNow: S, ready: P, state: y }); }
-export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapScanPromiseCache.clear(), bitmapSearchCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
+export function clearCaches() { foundBitmapCache.clear(), bitmapPromiseCache.clear(), bitmapScanPromiseCache.clear(), bitmapSearchCache.clear(), bitmapBlockClaimCache.clear(), bitmapBlockClaimPromiseCache.clear(), blockInfoCache.clear(), rawTransactionCountCache.clear(), parcelContentCache.clear(), parsedBlockCache.clear(), parsedBlockPromiseCache.clear(), parentIdsCache.clear(), inscriptionInfoCache.clear(), childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), parcelStateCache.clear(), mondrianCache.clear(), tipCache = { height: null, expiresAt: 0 }; }
 export function clearParcelCache(e) { if (void 0 === e)
     return childrenDetailsCache.clear(), childrenDetailsPromiseCache.clear(), void parcelStateCache.clear(); checkBitmapNumber(e), parcelStateCache.delete(e); }
-export const storage = Object.freeze({ ready: async () => await initialiseStorage(), available: () => indexedDbAvailable(), getBitmap: async (e) => (checkBitmapNumber(e), await storageGetBitmapSafe(e)), getParcel: async (e, t) => (checkParcelNumber(e), checkBitmapNumber(t), await storageGetParcelSafe(e, t)), getBitmapParcels: async (e) => (checkBitmapNumber(e), await storageGetBitmapParcelsSafe(e)), getBitmapState: async (e) => (checkBitmapNumber(e), await storageGetBitmapStateSafe(e)), getMondrian: async (e) => (checkBitmapNumber(e), await storageGetMondrianSafe(e)), async clear() { if (!indexedDbAvailable())
+export const storage = Object.freeze({ ready: async () => await initialiseStorage(), available: () => indexedDbAvailable(), getBitmap: async (e) => (checkBitmapNumber(e), await storageGetBitmapSafe(e)), getParcel: async (e, t) => (checkParcelNumber(e), checkBitmapNumber(t), await storageGetParcelSafe(e, t)), getBitmapParcels: async (e) => (checkBitmapNumber(e), await storageGetBitmapParcelsSafe(e)), getBitmapState: async (e) => (checkBitmapNumber(e), await storageGetBitmapStateSafe(e)), getMondrian: async (e) => (checkBitmapNumber(e), await storageGetMondrianSafe(e)), getCompactPattern: async (e) => (checkBitmapNumber(e), await storageGetCompactPatternSafe(e)), async clear() { if (!indexedDbAvailable())
         return !1; const e = await openStorageDb(); if (!e)
         return !1; const t = await clearStorageForProtocolChange(e); return t && (await idbPut("meta", { key: "schema", dbVersion: STORAGE_DB_VERSION, protocolVersion: STORAGE_PROTOCOL_VERSION, sdkName: SDK_NAME, moduleVersion: VERSION, updatedAt: Date.now() }), clearCaches(), notifyStorageSubscribers({ type: "storage-cleared" })), t; }, getChildrenTree: async (e) => (checkInscriptionId(e), await storageGetChildTreeSafe(e)), async getSatChain(e) { if (!Number.isSafeInteger(e) || e < 0)
         throw new TypeError("sat must be a non-negative safe integer"); return await storageGetSatChainSafe(e); }, async getStatus() { const e = await initialiseStorage(); if (!e.available)
-        return { ...e, bitmaps: 0, parcels: 0, bitmapState: 0, mondrians: 0, blockHashes: 0, childTrees: 0, satChains: 0, parcelClaims: 0, bitmapSearch: 0, lastProcessedHeight: null, lastProcessedHash: null, coverageStartHeight: null }; const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch"], [a, r, n, i] = await Promise.all([Promise.all(t.map(e => idbCount(e))), getMetaValue("watch:lastProcessedHeight"), getMetaValue("watch:lastProcessedHash"), getMetaValue("watch:coverageStartHeight")]); return { ...e, ...Object.fromEntries(t.map((e, t) => [e, a[t]])), lastProcessedHeight: r, lastProcessedHash: n, coverageStartHeight: i }; }, subscribe(e) { if ("function" != typeof e)
+        return { ...e, bitmaps: 0, parcels: 0, bitmapState: 0, mondrians: 0, blockHashes: 0, childTrees: 0, satChains: 0, parcelClaims: 0, bitmapSearch: 0, bitmapBlockIndex: 0, lastProcessedHeight: null, lastProcessedHash: null, coverageStartHeight: null }; const t = ["bitmaps", "parcels", "bitmapState", "mondrians", "blockHashes", "childTrees", "satChains", "parcelClaims", "bitmapSearch", "bitmapBlockIndex"], [a, r, n, i] = await Promise.all([Promise.all(t.map(e => idbCount(e))), getMetaValue("watch:lastProcessedHeight"), getMetaValue("watch:lastProcessedHash"), getMetaValue("watch:coverageStartHeight")]); return { ...e, ...Object.fromEntries(t.map((e, t) => [e, a[t]])), lastProcessedHeight: r, lastProcessedHash: n, coverageStartHeight: i }; }, subscribe(e) { if ("function" != typeof e)
         throw new TypeError("storage.subscribe requires a function"); return storageSubscribers.add(e), ensureStorageChannel(), () => storageSubscribers.delete(e); }, close() { if (storageChannel) {
         try {
             storageChannel.close();
@@ -1009,5 +1740,5 @@ export const storage = Object.freeze({ ready: async () => await initialiseStorag
         catch { }
         storageChannel = null;
     } storageDbPromise && storageDbPromise.then(e => e?.close()).catch(() => { }), storageDbPromise = null, storageInitialisedPromise = null; } });
-const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
+const BitmapSDK = Object.freeze({ SDK_NAME, VERSION, OLD_OCI_LIMIT: 942e3, MONDRIAN_MODULE_ID, STORAGE_DB_NAME, STORAGE_DB_VERSION, STORAGE_PROTOCOL_VERSION, getChainHeight, getBlockHash, getBlockHashWithRetry, scanBitmapClaim, getBitmapInscriptionId, getBitmapSat, validateBitmap, getBitmapParcels, getParcelInscriptionId, validateParcel, validateParcelInscription, parseBitmapName, parseParcelName, compareParcelClaims, getBitmapPattern, getBitmapPatternInfo, getBitmapMondrian, packBitmapPattern, unpackBitmapPattern, getBitmapPatternManifest, decodeBitmapPatternManifest, getBitmapGeometryFromPattern, getBitmapGeometryFromManifest, cacheBitmapPatternManifest, BROTLI_OC_INSCRIPTION_ID, BROTLI_DECODE_INSCRIPTION_ID, getChildrenTree, getReinscriptionChain, getBitmapTree, getBitmapData, getParcelData, syncBitmap, indexBitmapBlocks, scanBlock, getLatestBlockUpdates, watchBlocks, storage, clearParcelCache, clearCaches });
 export default BitmapSDK;
