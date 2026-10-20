@@ -12,6 +12,7 @@ const hexJs = await readFile(new URL("./ordinals-hex-benchmark-console.js", impo
 const packJs = await readFile(new URL("./ordinals-pattern-packing-console.js", import.meta.url), "utf8");
 const manifestJs = await readFile(new URL("./ordinals-pattern-manifest-console.js", import.meta.url), "utf8");
 const onchainBrotliProbe = await readFile(new URL("./ordinals-brotli-compat-console.js", import.meta.url), "utf8");
+const codecBenchmark = await readFile(new URL("./ordinals-codec-benchmark-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -106,4 +107,17 @@ test("on-chain Brotli compatibility probe uses exact inscribed module and same-o
   assert.match(onchainBrotliProbe, /globalThis\.BrotliOC/);
   assert.match(onchainBrotliProbe, /digestMatches/);
   assert.equal(/https?:\/\/[^"' ]+/.test(onchainBrotliProbe),false);
+});
+
+test("840000 warm Brotli vs gzip probe is read-only and validates both payloads", () => {
+  assert.doesNotThrow(() => new Script(codecBenchmark, {filename:"ordinals-codec-benchmark-console.js"}));
+  assert.match(codecBenchmark, /DecompressionStream\("gzip"\)/);
+  assert.match(codecBenchmark, /await import\("\/content\/" \+ BROTLI_OC_ID\)/);
+  assert.match(codecBenchmark, /const COUNT = 10/);
+  assert.match(codecBenchmark, /const WARMUPS = 2/);
+  assert.match(codecBenchmark, /sha256\(gzReference\)/);
+  assert.match(codecBenchmark, /compare\(brReference,gzReference\)/);
+  assert.match(codecBenchmark, /window\.__bitmapCodecBenchmark840000|globalThis\.__bitmapCodecBenchmark840000/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(codecBenchmark),false,
+    "Probe must use embedded fixtures and same-origin on-chain loader only");
 });
