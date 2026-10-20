@@ -14,6 +14,7 @@ const manifestJs = await readFile(new URL("./ordinals-pattern-manifest-console.j
 const onchainBrotliProbe = await readFile(new URL("./ordinals-brotli-compat-console.js", import.meta.url), "utf8");
 const codecBenchmark = await readFile(new URL("./ordinals-codec-benchmark-console.js", import.meta.url), "utf8");
 const brTransportProbe = await readFile(new URL("./ordinals-http-brotli-geometry-console.js", import.meta.url), "utf8");
+const coverageProbe = await readFile(new URL("./ordinals-existing-pattern-coverage-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -135,4 +136,15 @@ test("Ord content-encoding and 840000 compressed geometry probe uses only safe r
   assert.match(brTransportProbe,/const PACKED_SHA="3469c9067eade08b6a0213345d3d22f0751790e425d67eb304c72faf5c29e858"/);
   assert.equal(/fetch\(\s*["'\x60]\/r\/block\//.test(brTransportProbe),false);
   assert.equal(/https?:\/\/[^"' ]+/.test(brTransportProbe),false);
+});
+
+
+test("existing Bitmon on-chain index coverage probe has valid syntax and cannot download raw blocks",()=>{
+  assert.doesNotThrow(()=>new Script(coverageProbe,{filename:"ordinals-existing-pattern-coverage-console.js"}));
+  assert.match(coverageProbe,/getPatternArray\(height\)/);
+  assert.match(coverageProbe,/const SAMPLE_HEIGHTS = \[177700, 500000, 700000, 767430, 800000, 840000, 900000, 960000\]/);
+  assert.match(coverageProbe,/await import\("\/content\/" \+ MONDRIAN_ID\)/);
+  assert.match(coverageProbe,/__bitmapExistingIndexCoverage/);
+  assert.doesNotMatch(coverageProbe,/fetch\s*\(/);
+  assert.doesNotMatch(coverageProbe,/https?:\/\/[^"' ]+/);
 });
