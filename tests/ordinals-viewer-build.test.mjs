@@ -167,7 +167,7 @@ test("3-real-block Ord bundle probe parses, stays same-origin and constrains raw
 });
 
 
-test("real three-block header comparison is syntax-valid, local, and never fetches blocks",()=>{
+test("real three-block header comparison self-recovers after page reload using same-origin recursive blocks",()=>{
   assert.doesNotThrow(()=>new Script(headerComparisonProbe,
     {filename:"ordinals-real-3block-header-compare-console.js"}));
   assert.match(headerComparisonProbe,/__bitmapReal3BlockPackedFixture/);
@@ -176,6 +176,11 @@ test("real three-block header comparison is syntax-valid, local, and never fetch
   assert.match(headerComparisonProbe,/await hash\(r\.packedBytes\)|await hash\(row\.packedBytes\)/);
   assert.match(headerComparisonProbe,/const read=readBundle\(raw,mode\)/);
   assert.match(headerComparisonProbe,/__bitmap3BlockHeaderComparison/);
+  assert.match(headerComparisonProbe,/if\(!Array\.isArray\(originals\)\|\|originals\.length!==3\)/);
+  assert.match(headerComparisonProbe,/getBitmapPattern\(height,\{forceLive:true\}\)/);
+  assert.match(headerComparisonProbe,/rawHeightsFetched\.push\(height\)/);
+  assert.match(headerComparisonProbe,/fixtureRebuilt:reconstructedMissingFixture/);
+  assert.match(headerComparisonProbe,/__bitmapReal3BlockPackedFixture=regenerated/);
   assert.doesNotMatch(headerComparisonProbe,/\bfetch\s*\(/);
   assert.doesNotMatch(headerComparisonProbe,/https?:\/\/[^"' ]+/);
   assert.doesNotMatch(headerComparisonProbe,/wallet\.|signPsbt|sendBitcoin|inscribe\(/i);
