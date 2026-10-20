@@ -319,3 +319,28 @@ BrotliOC results. A test run on a warm page does not measure a brand-new
 browser/module initialization. The test is **read-only** and does not inscribe
 or merge anything. Compression ratios alone do not establish total
 runtime performance. Do not infer warm latency from first-call times.
+
+## I. Real Ord Content-Encoding: br and 840000 geometry
+
+Paste [ordinals-http-brotli-geometry-console.js](./ordinals-http-brotli-geometry-console.js)
+into the DevTools Console of a same-origin Ordinals HTML inscription viewer.
+
+The probe contains two **independent read-only** tests:
+
+1. Fetch an existing small Brotli-encoded HTML inscription using
+   `/content/6d4ae768dfa5f7c7a275673fc82a323fc0daf4a61f00e4dd538385ed1f62368ci278`.
+   Record HTTP status, content-encoding, content-length, decoded body
+   length, and whether the fetched bytes resemble HTML. The HTML is never
+   executed. Some gateway/request combinations may return HTTP 406.
+2. Decode the previously captured 405-byte Brotli 840000 fixture with
+   the existing BrotliOC inscription, validate SHA-256 and the canonical
+   `/r/blockhash/840000`, import the inscribed Mondrian primitive, and
+   assert 3,050 parcel slots and 48 empty spaces, without `/r/block/840000`.
+
+Inspect with `console.log(window.__bitmap840000TransportReport)`.
+
+The second test uses an embedded pattern fixture: **no actual 840000 pattern
+inscription has been made or fetched over `/content`**. Passing these tests
+does not authenticate the source of a future pattern inscription; a
+block hash plus pattern digest does not prove derivation correctness.
+Neither test initiates a wallet action, merge, deployment or inscription.
