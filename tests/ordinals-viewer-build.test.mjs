@@ -15,6 +15,7 @@ const onchainBrotliProbe = await readFile(new URL("./ordinals-brotli-compat-cons
 const codecBenchmark = await readFile(new URL("./ordinals-codec-benchmark-console.js", import.meta.url), "utf8");
 const brTransportProbe = await readFile(new URL("./ordinals-http-brotli-geometry-console.js", import.meta.url), "utf8");
 const coverageProbe = await readFile(new URL("./ordinals-existing-pattern-coverage-console.js", import.meta.url), "utf8");
+const realBundleProbe = await readFile(new URL("./ordinals-real-3block-bundle-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -147,4 +148,19 @@ test("existing Bitmon on-chain index coverage probe has valid syntax and cannot 
   assert.match(coverageProbe,/__bitmapExistingIndexCoverage/);
   assert.doesNotMatch(coverageProbe,/fetch\s*\(/);
   assert.doesNotMatch(coverageProbe,/https?:\/\/[^"' ]+/);
+});
+
+
+test("3-real-block Ord bundle probe parses, stays same-origin and constrains raw fetch to two blocks",()=>{
+  assert.doesNotThrow(()=>new Script(realBundleProbe,{filename:"ordinals-real-3block-bundle-console.js"}));
+  assert.match(realBundleProbe,/HEIGHTS=\[839999,840000,840001\]/);
+  assert.match(realBundleProbe,/sdk\.getBitmapPattern\(height,\{forceLive:true\}\)/);
+  assert.match(realBundleProbe,/height===840000\?pattern840000/);
+  assert.match(realBundleProbe,/sdk\.getBlockHash\(height\)/);
+  assert.match(realBundleProbe,/const bundle=makeBundle\(entries\)/);
+  assert.match(realBundleProbe,/OC\.compress\(bundle,\{quality:11\}\)/);
+  assert.match(realBundleProbe,/gzipCompress\(bundle\)/);
+  assert.match(realBundleProbe,/__bitmapReal3BlockBundleProbe/);
+  assert.doesNotMatch(realBundleProbe,/https?:\/\/[^"' ]+/);
+  assert.doesNotMatch(realBundleProbe,/wallet\.|signPsbt|sendBitcoin|inscribe\(/i);
 });
