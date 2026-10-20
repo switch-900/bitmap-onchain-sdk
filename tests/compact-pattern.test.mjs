@@ -125,8 +125,9 @@ test("integrity rejects corrupt payload, invalid padding, invalid size and SHA",
   assert.throws(()=>sdk.packBitmapPattern([10]),/Invalid Mondrian/);
 });
 
-test("raw verified manifest can enter isolated pattern store; stale block hash invalidates read",async()=>{
-  const {sdk,rawHits,setBlockHash}=makeSDK({withStorage:true});
+test("raw verified manifest can enter isolated pattern store; stale block hash invalidates read",{timeout:20000},async()=>{
+  const {sdk,setBlockHash}=makeSDK({withStorage:true});
+  try {
   assert.equal((await sdk.storage.ready()).dbVersion,4);
   const manifest=await sdk.getBitmapPatternManifest(HEIGHT,{compression:"gzip"});
   assert.equal(manifest.verifiedAgainstRawBlock,true);
@@ -137,7 +138,6 @@ test("raw verified manifest can enter isolated pattern store; stale block hash i
   const stored=await sdk.storage.getCompactPattern(HEIGHT);
   assert.equal(stored.packedBytes.length,1525);
   assert.equal(stored.verifiedAgainstRawBlock,true);
-  const rawBefore=sdk.storage.getCompactPattern ? null:null;
   const reused=await sdk.getBitmapPatternInfo(HEIGHT);
   assert.equal(reused.source,"verified-compact-pattern-cache");
   setBlockHash("f".repeat(64));
@@ -145,18 +145,19 @@ test("raw verified manifest can enter isolated pattern store; stale block hash i
   assert.equal(stale.source,"recursive-raw-block");
   assert.equal(stale.pattern.length,3050);
   await assert.rejects(sdk.cacheBitmapPatternManifest(manifest),/does not match chain/);
-  sdk.storage.close();
+  } finally {sdk.storage.close();}
 });
 
-test("unverified manifests are refused by trusted IndexedDB import",async()=>{
+test("unverified manifests are refused by trusted IndexedDB import",{timeout:20000},async()=>{
   const {sdk,fetches}=makeSDK({withStorage:true});
+  try {
   await assert.rejects(
     sdk.cacheBitmapPatternManifest(makeRealManifest(),{verifyAgainstRawBlock:false}),
     /Unverified compact Mondrian manifests/
   );
   assert.equal((await sdk.storage.getCompactPattern(HEIGHT)),null);
   assert.deepEqual(fetches,[]);
-  sdk.storage.close();
+  } finally {sdk.storage.close();}
 });
 
 test("Brotli manifests need native support or an explicit decoder, never silently use gzip",async()=>{
