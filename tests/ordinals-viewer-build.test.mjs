@@ -16,6 +16,7 @@ const codecBenchmark = await readFile(new URL("./ordinals-codec-benchmark-consol
 const brTransportProbe = await readFile(new URL("./ordinals-http-brotli-geometry-console.js", import.meta.url), "utf8");
 const coverageProbe = await readFile(new URL("./ordinals-existing-pattern-coverage-console.js", import.meta.url), "utf8");
 const realBundleProbe = await readFile(new URL("./ordinals-real-3block-bundle-console.js", import.meta.url), "utf8");
+const headerComparisonProbe = await readFile(new URL("./ordinals-real-3block-header-compare-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -163,4 +164,19 @@ test("3-real-block Ord bundle probe parses, stays same-origin and constrains raw
   assert.match(realBundleProbe,/__bitmapReal3BlockBundleProbe/);
   assert.doesNotMatch(realBundleProbe,/https?:\/\/[^"' ]+/);
   assert.doesNotMatch(realBundleProbe,/wallet\.|signPsbt|sendBitcoin|inscribe\(/i);
+});
+
+
+test("real three-block header comparison is syntax-valid, local, and never fetches blocks",()=>{
+  assert.doesNotThrow(()=>new Script(headerComparisonProbe,
+    {filename:"ordinals-real-3block-header-compare-console.js"}));
+  assert.match(headerComparisonProbe,/__bitmapReal3BlockPackedFixture/);
+  assert.match(headerComparisonProbe,/for\(const mode of \["v1","lean"\]\)/);
+  assert.match(headerComparisonProbe,/mode==="v1"\?76:44/);
+  assert.match(headerComparisonProbe,/await hash\(r\.packedBytes\)|await hash\(row\.packedBytes\)/);
+  assert.match(headerComparisonProbe,/const read=readBundle\(raw,mode\)/);
+  assert.match(headerComparisonProbe,/__bitmap3BlockHeaderComparison/);
+  assert.doesNotMatch(headerComparisonProbe,/\bfetch\s*\(/);
+  assert.doesNotMatch(headerComparisonProbe,/https?:\/\/[^"' ]+/);
+  assert.doesNotMatch(headerComparisonProbe,/wallet\.|signPsbt|sendBitcoin|inscribe\(/i);
 });
