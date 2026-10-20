@@ -26,7 +26,18 @@ function manifest(br) {
   };
 }
 
-function harness({ preloaded=false, classic=false, failingImport=false }={}) {
+function makeNativeStream(compress) {
+  const chunks=[];
+  return new TransformStream({
+    transform(chunk){chunks.push(Buffer.from(chunk));},
+    flush(controller) {
+      const src=Buffer.concat(chunks);
+      controller.enqueue(new Uint8Array(compress ?
+        brotliCompressSync(src) : brotliDecompressSync(src)));
+    }
+  });
+}
+function harness({ preloaded=false, classic=false, failingImport=false, nativeBrotli=false }={}) {
   const gzipPacked = brotliDecompressSync(brotliCompressSync(Buffer.alloc(10)));
   void gzipPacked;
   let loaded=0, compressed=0, decompressed=0;
@@ -45,13 +56,19 @@ function harness({ preloaded=false, classic=false, failingImport=false }={}) {
     crypto:webcrypto,
     DecompressionStream:class {
       constructor(format){
-        if(format==="brotli") throw Error("Browser without native Brotli stream");
+        if(format==="brotli") {
+          if (!nativeBrotli) throw Error("Browser without native Brotli stream");
+          return makeNativeStream(false);
+        }
         return new DecompressionStream(format);
       }
     },
     CompressionStream:class {
       constructor(format){
-        if(format==="brotli") throw Error("Browser without native Brotli stream");
+        if(format==="brotli") {
+          if (!nativeBrotli) throw Error("Browser without native Brotli stream");
+          return makeNativeStream(true);
+        }
         return new CompressionStream(format);
       }
     },
@@ -123,4 +140,18 @@ test("explicit decoder remains supported and takes precedence",async()=>{
   });
   assert.equal(decoded.pattern.length,3050);
   assert.equal(calls().loaded,0);
+});
+
+
+test("native Brotli streams are preferred when available, with no on-chain module import", async()=>{
+  const gz=(await import("node:zlib")).gunzipSync(Buffer.from(GZIP,"base64"));
+  const {api,calls}=harness({nativeBrotli:true,failingImport:true});
+  const encoded=await api.compactCodec(gz,"brotli",true);
+  const manifestData=manifest(Buffer.from(encoded));
+  const decoded=await api.decodeBitmapPatternManifest(manifestData);
+  assert.equal(decoded.pattern.length,3050);
+  assert.equal(decoded.packedSha256,REAL_SHA);
+  assert.equal(calls().loaded,0);
+  assert.equal(calls().compressed,0);
+  assert.equal(calls().decompressed,0);
 });
