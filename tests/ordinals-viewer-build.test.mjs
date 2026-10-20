@@ -126,7 +126,6 @@ test("840000 warm Brotli vs gzip probe is read-only and validates both payloads"
 
 test("Ord content-encoding and 840000 compressed geometry probe uses only safe recursive paths",()=>{
   assert.doesNotThrow(()=>new Script(brTransportProbe,{filename:"ordinals-http-brotli-geometry-console.js"}));
-  assert.match(brTransportProbe,/\/content\/6d4ae768dfa5f7c7a275673fc82a323fc0daf4a61f00e4dd538385ed1f62368ci278/);
   assert.match(brTransportProbe,/const KNOWN_BR="6d4ae768dfa5f7c7a275673fc82a323fc0daf4a61f00e4dd538385ed1f62368ci278"/);
   assert.match(brTransportProbe,/await fetch\("\/content\/"\+KNOWN_BR\)/);
   assert.match(brTransportProbe,/await fetch\("\/r\/blockhash\/"\+HEIGHT\)/);
