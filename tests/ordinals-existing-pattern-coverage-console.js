@@ -1,8 +1,9 @@
 /*
- * Bitmap SDK on-chain pattern coverage probe — READ-ONLY.
+ * Bitmon selective repeated-pattern catalogue lookup — READ-ONLY.
  * Paste into an existing Ord HTML inscription DevTools Console.
  * Imports the existing canonical Bitmon/Mondrian inscription and checks
  * selected heights without calling /r/block/ or modifying caches.
+ * Missing entries are normal: this is NOT a general Bitcoin-block index.
  */
 (async () => {
   "use strict";
@@ -20,29 +21,29 @@
     try {
       const pattern=module.getPatternArray(height);
       if (pattern == null || (Array.isArray(pattern) && pattern.length===0)) {
-        results.push({height,indexed:false,txCount:null,patternLength:null,validSizes:null,
+        results.push({height,bitmonCatalogueEntry:false,txCount:null,patternLength:null,validSizes:null,
           indexLookupMs:Math.round((performance.now()-started)*1000)/1000});
         continue;
       }
       if (!Array.isArray(pattern)) throw Error("Pattern is not an array");
       const validSizes=pattern.every(n=>Number.isInteger(Number(n)) && n>=1 && n<=9);
-      results.push({height,indexed:true,txCount:pattern.length,patternLength:pattern.length,
+      results.push({height,bitmonCatalogueEntry:true,txCount:pattern.length,patternLength:pattern.length,
         validSizes,indexLookupMs:Math.round((performance.now()-started)*1000)/1000});
     } catch (error) {
-      results.push({height,indexed:false,error:String(error?.message||error),
+      results.push({height,bitmonCatalogueEntry:false,error:String(error?.message||error),
         indexLookupMs:Math.round((performance.now()-started)*1000)/1000});
     }
   }
   const out = {
     moduleId: MONDRIAN_ID,
     moduleLoadMs, heights: SAMPLE_HEIGHTS,
-    confirmedIndexHits:results.filter(row=>row.indexed).length,
-    note:"This probes existing module coverage only. It does not authenticate any pattern against raw Bitcoin output amounts.",
+    bitmonCatalogueEntries:results.filter(row=>row.bitmonCatalogueEntry).length,
+    note:"This probes selective repeated-pattern Bitmon catalogue membership. Missing entries are expected and are not errors or general Bitmap geometry gaps.",
     rows:results
   };
   globalThis.__bitmapExistingIndexCoverage=out;
   console.table(results);
-  console.log("Existing on-chain pattern index coverage:",out.confirmedIndexHits,"/",results.length);
-  console.log("Full report at window.__bitmapExistingIndexCoverage");
+  console.log("Selective Bitmon catalogue entries:",out.bitmonCatalogueEntries,"/",results.length);
+  console.log("Full report at window.__bitmapExistingIndexCoverage (legacy test name)");
   return out;
 })();
