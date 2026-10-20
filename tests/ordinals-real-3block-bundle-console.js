@@ -21,6 +21,10 @@
     runtimePath:location.pathname,records:[],
     codecImportMs:null,rawFetchMs:null,packedBytes:null,recordHeaderBytes:76,
     bundleBytes:null,brotliBytes:null,gzipBytes:null,
+    standaloneBrotliPatternBytes:null,standaloneGzipPatternBytes:null,
+    standaloneSelfDescribingBrotliBytes:null,standaloneSelfDescribingGzipBytes:null,
+    bundleSavingsVsStandalonePatternBrotliBytes:null,
+    bundleSavingsVsSelfDescribingBrotliBytes:null,
     brotliCompressMs:null,gzipCompressMs:null,
     brotliRoundtrip:false,gzipRoundtrip:false,recordRoundtrip:false,
     trustedForProduction:false,errors:[]};
@@ -163,6 +167,46 @@
     report.gzipRoundtrip=equal(await gzipDecompress(gz),bundle);
     if(!report.brotliRoundtrip||!report.gzipRoundtrip)
       throw Error("Compressed bundle failed roundtrip");
+    // Fair decision data: compare the SAME three real patterns compressed
+    // separately, with and without self-describing per-block metadata.
+    // Inscription envelope fees, directory and HTTP request overhead excluded.
+    const standalone=[];
+    for (const e of entries) {
+      const onlyPatternBr=await OC.compress(e.packed,{quality:11});
+      const onlyPatternGz=await gzipCompress(e.packed);
+      const isolatedRecord=makeBundle([e]); // 8-byte header + 76-byte record
+      const recordBr=await OC.compress(isolatedRecord,{quality:11});
+      const recordGz=await gzipCompress(isolatedRecord);
+      const toBytes=x=>x instanceof Uint8Array?x:new Uint8Array(x);
+      const packedBr=toBytes(onlyPatternBr),selfBr=toBytes(recordBr);
+      if (!equal(toBytes(await OC.decompress(packedBr)),e.packed) ||
+          !equal(toBytes(await OC.decompress(selfBr)),isolatedRecord) ||
+          !equal(await gzipDecompress(onlyPatternGz),e.packed) ||
+          !equal(await gzipDecompress(recordGz),isolatedRecord))
+        throw Error("One of the standalone codec roundtrips failed at block "+e.height);
+      standalone.push({height:e.height,
+        patternBrotliBytes:packedBr.length,
+        patternGzipBytes:onlyPatternGz.length,
+        selfDescribingBrotliBytes:selfBr.length,
+        selfDescribingGzipBytes:recordGz.length});
+    }
+    report.standalone=standalone;
+    const sum=key=>standalone.reduce((n,row)=>n+row[key],0);
+    report.standaloneBrotliPatternBytes=sum("patternBrotliBytes");
+    report.standaloneGzipPatternBytes=sum("patternGzipBytes");
+    report.standaloneSelfDescribingBrotliBytes=sum("selfDescribingBrotliBytes");
+    report.standaloneSelfDescribingGzipBytes=sum("selfDescribingGzipBytes");
+    report.bundleSavingsVsStandalonePatternBrotliBytes=
+      report.standaloneBrotliPatternBytes-report.brotliBytes;
+    report.bundleSavingsVsSelfDescribingBrotliBytes=
+      report.standaloneSelfDescribingBrotliBytes-report.brotliBytes;
+    // Preserve the three exact raw-derived, unpacked patterns in memory only
+    // for subsequent read-only codec/layout experiments in THIS viewer tab.
+    // Not trusted as consensus proofs and never inserted in persistent cache.
+    globalThis.__bitmapReal3BlockPackedFixture=entries.map(e=>({
+      height:e.height,blockHash:e.blockHash,packedSha256:e.packedSha,
+      transactionCount:e.pattern.length,packedBytes:e.packed.slice()
+    }));
     report.elapsedMs=round(performance.now()-start);
     console.table(report.records.map(r=>({
       height:r.height,source:r.source,transactions:r.txCount,packedBytes:r.packedBytes
@@ -172,6 +216,11 @@
       bundleBytes:report.bundleBytes,
       brotli11Bytes:report.brotliBytes,
       gzipBytes:report.gzipBytes,
+      separatelyCompressedPatternsBrotliBytes:report.standaloneBrotliPatternBytes,
+      separatelyCompressedPatternsGzipBytes:report.standaloneGzipPatternBytes,
+      separatelyCompressedSelfDescribingBrotliBytes:report.standaloneSelfDescribingBrotliBytes,
+      bundleSavingsVsSeparateBareBrotli:report.bundleSavingsVsStandalonePatternBrotliBytes,
+      bundleSavingsVsSelfDescribingBrotli:report.bundleSavingsVsSelfDescribingBrotliBytes,
       allPatternsMatch:report.recordRoundtrip,
       brotliRoundtrip:report.brotliRoundtrip,
       gzipRoundtrip:report.gzipRoundtrip,
