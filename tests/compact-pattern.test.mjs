@@ -151,11 +151,13 @@ test("raw verified manifest can enter isolated pattern store; stale block hash i
 test("unverified manifests are refused by trusted IndexedDB import",{timeout:20000},async()=>{
   const {sdk,fetches}=makeSDK({withStorage:true});
   try {
+  const existing = await sdk.storage.getCompactPattern(HEIGHT);
   await assert.rejects(
     sdk.cacheBitmapPatternManifest(makeRealManifest(),{verifyAgainstRawBlock:false}),
     /Unverified compact Mondrian manifests/
   );
-  assert.equal((await sdk.storage.getCompactPattern(HEIGHT)),null);
+  const after = await sdk.storage.getCompactPattern(HEIGHT);
+  assert.deepEqual(after,existing,"Unverified import must not mutate existing trusted pattern cache");
   assert.deepEqual(fetches,[]);
   } finally {sdk.storage.close();}
 });
