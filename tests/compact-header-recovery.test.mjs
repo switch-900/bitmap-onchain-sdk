@@ -53,7 +53,7 @@ test("metadata comparison recovers independently after page reload, then reuses 
     browser.BrotliOC=BrotliOC;
   };
   const runner=new Function("mockImportSDK","mockImportBrotli",
-    "globalThis","crypto","atob","performance","console",source);
+    "globalThis","crypto","atob","performance","console","return "+source);
 
   const first=await runner(getModule,loadBrotli,browser,webcrypto,
     (b64)=>Buffer.from(b64,"base64").toString("binary"),performance,consoleMock);
