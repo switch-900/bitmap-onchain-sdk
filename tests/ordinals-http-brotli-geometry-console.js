@@ -36,7 +36,6 @@
   };
   const round=n=>Math.round(n*10)/10;
   const bytes=b64=>Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-  const start=performance.now();
   const digest=async data=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",data)),
     b=>b.toString(16).padStart(2,"0")).join("");
   function unpack(packed,count) {
@@ -81,6 +80,7 @@
 
   // The remainder uses exact compact bytes from the user-verified manifest.
   // No network raw block lookup is needed to calculate pattern geometry.
+  const compactStart=performance.now();
   try {
     let t=performance.now();
     await import("/content/"+BR_CODEC);
@@ -124,7 +124,7 @@
     report.compact.dimensions=layout.getSize?.()??{width:layout.width,height:layout.height};
     if(occupied.length!==3050 || gaps.length!==48)
       throw Error("Unexpected geometry count: slots="+occupied.length+", gaps="+gaps.length);
-    report.compact.totalMs=round(performance.now()-start);
+    report.compact.totalMs=round(performance.now()-compactStart);
     console.table({
       compactBytes:report.compact.compressedBytes,
       packedBytes:report.compact.packedBytes,
