@@ -141,10 +141,16 @@ test("raw verified manifest can enter isolated pattern store; stale block hash i
   assert.equal(stored.verifiedAgainstRawBlock,true);
   const reused=await sdk.getBitmapPatternInfo(HEIGHT);
   assert.equal(reused.source,"verified-compact-pattern-cache");
+  const geometry=await sdk.BitmapSDK.getBitmapMondrian(HEIGHT);
+  assert.equal(geometry.source,"verified-compact-pattern-cache");
+  assert.equal(geometry.slots.length,3050);
   setBlockHash("f".repeat(64));
   const stale=await sdk.getBitmapPatternInfo(HEIGHT);
   assert.equal(stale.source,"recursive-raw-block");
   assert.equal(stale.pattern.length,3050);
+  const rebuilt=await sdk.BitmapSDK.getBitmapMondrian(HEIGHT);
+  assert.equal(rebuilt.source,"recursive-raw-block",
+    "a reorg must invalidate full cached geometry derived from a compact pattern");
   await assert.rejects(sdk.cacheBitmapPatternManifest(manifest),/does not match chain/);
   } finally {sdk.storage.close();}
 });
