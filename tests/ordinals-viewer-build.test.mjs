@@ -11,6 +11,7 @@ const profilerJs = await readFile(new URL("./ordinals-mondrian-profiler-console.
 const hexJs = await readFile(new URL("./ordinals-hex-benchmark-console.js", import.meta.url), "utf8");
 const packJs = await readFile(new URL("./ordinals-pattern-packing-console.js", import.meta.url), "utf8");
 const manifestJs = await readFile(new URL("./ordinals-pattern-manifest-console.js", import.meta.url), "utf8");
+const onchainBrotliProbe = await readFile(new URL("./ordinals-brotli-compat-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -95,4 +96,14 @@ test("840000 compact pattern manifest export is read-only and roundtrips 3050 sl
   assert.deepEqual(unpack(encoded,values.length),values);
   assert.throws(()=>pack([0]),/Out-of-range Mondrian/);
   assert.throws(()=>unpack(Uint8Array.from([0x11,0x12]),3),/Invalid nonzero trailing nibble/);
+});
+
+
+test("on-chain Brotli compatibility probe uses exact inscribed module and same-origin imports",()=>{
+  assert.doesNotThrow(()=>new Script(onchainBrotliProbe, {filename:"ordinals-brotli-compat-console.js"}));
+  assert.match(onchainBrotliProbe, /fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0/);
+  assert.match(onchainBrotliProbe, /DecompressionStream\("brotli"\)/);
+  assert.match(onchainBrotliProbe, /globalThis\.BrotliOC/);
+  assert.match(onchainBrotliProbe, /digestMatches/);
+  assert.equal(/https?:\/\/[^"' ]+/.test(onchainBrotliProbe),false);
 });
