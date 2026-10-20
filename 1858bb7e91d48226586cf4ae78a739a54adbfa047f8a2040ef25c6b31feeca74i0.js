@@ -410,7 +410,7 @@ async function persistMondrian(e) { if (!(indexedDbAvailable() && e && Array.isA
     return !1; await initialiseStorage(); let t = null; try {
     t = await getBlockHash(e.bitmapNumber);
 }
-catch { } return await idbPut("mondrians", { bitmapNumber: e.bitmapNumber, source: e.source, transactionCount: e.transactionCount, pattern: e.pattern.slice(), width: e.width, height: e.height, length: e.length ?? null, slots: e.slots.map(e => ({ ...e })), ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {}, blockHash: t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), notifyStorageSubscribers({ type: "mondrian", bitmapNumber: e.bitmapNumber }), !0; }
+catch { } return await idbPut("mondrians", { bitmapNumber: e.bitmapNumber, source: e.source, transactionCount: e.transactionCount, pattern: e.pattern.slice(), width: e.width, height: e.height, length: e.length ?? null, slots: e.slots.map(e => ({ ...e })), ...Array.isArray(e.emptySpaces) ? { emptySpaces: e.emptySpaces.map(e => ({ ...e })) } : {}, blockHash: e.blockHash || t, protocolVersion: STORAGE_PROTOCOL_VERSION, storedAt: Date.now() }), notifyStorageSubscribers({ type: "mondrian", bitmapNumber: e.bitmapNumber }), !0; }
 async function tryAcquireStorageLease(e, t = 12e4) { if (!indexedDbAvailable())
     return { acquired: !0, persistent: !1, owner: storageInstanceId }; await initialiseStorage(); const a = await openStorageDb(); if (!a)
     return { acquired: !0, persistent: !1, owner: storageInstanceId }; try {
@@ -1005,13 +1005,21 @@ async function resolveBitmapPattern(height, {
     // Reuse the IndexedDB record the geometry caller already read.
     const record = forceLive ? null :
         cachedRecord === undefined ? await storageGetMondrianSafe(height) : cachedRecord;
-    if (!forceLive && Array.isArray(record?.pattern) && record.pattern.length > 0)
-        return {
+    if (!forceLive && Array.isArray(record?.pattern) && record.pattern.length > 0) {
+        const source = record.patternSource ?? record.source ?? "indexeddb";
+        const compactBacked = source === "verified-compact-pattern-cache";
+        let current = !compactBacked;
+        if (compactBacked && record.blockHash) {
+            try { current = record.blockHash === await getBlockHash(height); }
+            catch { current = false; }
+        }
+        if (current) return {
             pattern: validateMondrianPattern(record.pattern, height),
-            source: record.patternSource ?? record.source ?? "indexeddb",
-            cacheSource: "indexeddb",
+            source, cacheSource: "indexeddb",
+            ...(compactBacked ? { blockHash: record.blockHash } : {}),
             mondrianModule: await loadMondrianModule()
         };
+    }
     if (!forceLive) {
         const compact = await loadVerifiedCompactPattern(height);
         if (compact) return { ...compact, mondrianModule: await loadMondrianModule() };
@@ -1290,7 +1298,7 @@ async function loadVerifiedCompactPattern(height) {
         if (hash !== record.blockHash) return null;
         if (await compactSha256(record.packedBytes) !== record.packedSha256) return null;
         const pattern = unpackBitmapPattern(record.packedBytes, record.transactionCount);
-        return { pattern, source: "verified-compact-pattern-cache", cacheSource: "indexeddb" };
+        return { pattern, source: "verified-compact-pattern-cache", cacheSource: "indexeddb", blockHash: hash };
     } catch { return null; }
 }
 export async function cacheBitmapPatternManifest(manifest, {
@@ -1329,10 +1337,18 @@ export async function getBitmapMondrian(bitmapNumber, {
     const key = [bitmapNumber, includeEmptySpaces ? 1 : 0, includeClaims ? 1 : 0,
         includeValues ? 1 : 0, forceLive ? 1 : 0, allowLiveFallback ? 1 : 0].join(":");
     let cachedRecord = undefined;
+    let staleCompactGeometry = false;
     if (!includeClaims && !forceRefresh && !includeValues && !forceLive) {
         const cacheReadStarted = mondrianNow();
         cachedRecord = await storageGetMondrianSafe(bitmapNumber);
         reportMondrianStage(onTiming, "indexeddb-read", cacheReadStarted, { bitmapNumber });
+        if (cachedRecord?.patternSource === "verified-compact-pattern-cache") {
+            try {
+                staleCompactGeometry = !cachedRecord.blockHash ||
+                    (await getBlockHash(bitmapNumber)) !== cachedRecord.blockHash;
+            } catch { staleCompactGeometry = true; }
+            if (staleCompactGeometry) cachedRecord = null;
+        }
         if (Array.isArray(cachedRecord?.slots) &&
             (!includeEmptySpaces || Array.isArray(cachedRecord.emptySpaces))) {
             const result = storedMondrianToPublic(cachedRecord);
@@ -1341,7 +1357,7 @@ export async function getBitmapMondrian(bitmapNumber, {
             });
             return result;
         }
-        if (mondrianCache.has(key)) {
+        if (!staleCompactGeometry && mondrianCache.has(key)) {
             const result = mondrianCache.get(key);
             reportMondrianStage(onTiming, "total", totalStarted, {
                 bitmapNumber, source: "memory", cacheHit: true, slots: result.slots.length
@@ -1350,7 +1366,7 @@ export async function getBitmapMondrian(bitmapNumber, {
         }
     }
     const patternStarted = mondrianNow();
-    const { pattern, values = null, source, cacheSource = null, mondrianModule } =
+    const { pattern, values = null, source, cacheSource = null, mondrianModule, blockHash: resolvedBlockHash = null } =
         await resolveBitmapPattern(bitmapNumber, {
             forceLive, allowLiveFallback, onTiming, cachedRecord
         });
@@ -1418,6 +1434,7 @@ export async function getBitmapMondrian(bitmapNumber, {
     }
     const result = {
         bitmapNumber, source, patternSource: source,
+        ...(resolvedBlockHash ? { blockHash: resolvedBlockHash } : {}),
         indexed: source === "on-chain-pattern-index", cacheSource,
         transactionCount: pattern.length, pattern: pattern.slice(),
         width: dimensions.width, height: dimensions.height,
