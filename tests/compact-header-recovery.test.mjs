@@ -52,8 +52,11 @@ test("metadata comparison recovers independently after page reload, then reuses 
     moduleImports++;
     browser.BrotliOC=BrotliOC;
   };
+  const expressionStart=source.indexOf("(async()=>{");
+  assert.ok(expressionStart>0,"Browser probe async IIFE not found");
   const runner=new Function("mockImportSDK","mockImportBrotli",
-    "globalThis","crypto","atob","performance","console","return "+source);
+    "globalThis","crypto","atob","performance","console",
+    "return "+source.slice(expressionStart));
 
   const first=await runner(getModule,loadBrotli,browser,webcrypto,
     (b64)=>Buffer.from(b64,"base64").toString("binary"),performance,consoleMock);
