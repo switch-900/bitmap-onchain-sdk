@@ -470,9 +470,19 @@ console.log(patternInfo.indexed)
 console.log(patternInfo.cached)
 ```
 
-`indexed === true` means the pattern came from the canonical on-chain
-Mondrian/Bitmon pattern index. `cached` only describes whether IndexedDB
+`indexed === true` indicates a match from the **selective Bitmon
+repeated-pattern catalogue** inside the existing on-chain Mondrian module.
+That catalogue is **not intended to index every Bitcoin block**. A missing
+entry is normal and does not mean that Bitmap geometry is unavailable:
+the SDK can derive the distinct per-block pattern from raw Bitcoin transaction
+outputs. The name `on-chain-pattern-index` is retained as a legacy source
+identifier for existing consumers; it should not be interpreted as general
+Bitcoin-block index coverage. `cached` only describes whether IndexedDB
 accelerated the lookup; it does not change the underlying provenance.
+
+The proposed compact multi-block Bitmap bundle is a **different optional
+transport/cache** for general Bitmap patterns. It does not add entries to
+the Bitmon catalogue or change what qualifies as a Bitmon.
 
 Bitmap SDK can derive live Mondrian data from the recursive raw block endpoint:
 
