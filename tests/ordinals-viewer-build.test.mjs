@@ -13,6 +13,7 @@ const packJs = await readFile(new URL("./ordinals-pattern-packing-console.js", i
 const manifestJs = await readFile(new URL("./ordinals-pattern-manifest-console.js", import.meta.url), "utf8");
 const onchainBrotliProbe = await readFile(new URL("./ordinals-brotli-compat-console.js", import.meta.url), "utf8");
 const codecBenchmark = await readFile(new URL("./ordinals-codec-benchmark-console.js", import.meta.url), "utf8");
+const brTransportProbe = await readFile(new URL("./ordinals-http-brotli-geometry-console.js", import.meta.url), "utf8");
 const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 if (!match) throw new Error("Missing inline viewer module");
 
@@ -120,4 +121,19 @@ test("840000 warm Brotli vs gzip probe is read-only and validates both payloads"
   assert.match(codecBenchmark, /window\.__bitmapCodecBenchmark840000|globalThis\.__bitmapCodecBenchmark840000/);
   assert.equal(/https?:\/\/[^"' ]+/.test(codecBenchmark),false,
     "Probe must use embedded fixtures and same-origin on-chain loader only");
+});
+
+
+test("Ord content-encoding and 840000 compressed geometry probe uses only safe recursive paths",()=>{
+  assert.doesNotThrow(()=>new Script(brTransportProbe,{filename:"ordinals-http-brotli-geometry-console.js"}));
+  assert.match(brTransportProbe,/\/content\/6d4ae768dfa5f7c7a275673fc82a323fc0daf4a61f00e4dd538385ed1f62368ci278/);
+  assert.match(brTransportProbe,/const KNOWN_BR="6d4ae768dfa5f7c7a275673fc82a323fc0daf4a61f00e4dd538385ed1f62368ci278"/);
+  assert.match(brTransportProbe,/await fetch\("\/content\/"\+KNOWN_BR\)/);
+  assert.match(brTransportProbe,/await fetch\("\/r\/blockhash\/"\+HEIGHT\)/);
+  assert.match(brTransportProbe,/const layout=new layoutModule\.MondrianLayout\(pattern\)/);
+  assert.match(brTransportProbe,/layout\.fillEmptySpaces\(true\)/);
+  assert.match(brTransportProbe,/const BR_B64="G\/QFg/);
+  assert.match(brTransportProbe,/const PACKED_SHA="3469c9067eade08b6a0213345d3d22f0751790e425d67eb304c72faf5c29e858"/);
+  assert.equal(/fetch\(\s*["'\x60]\/r\/block\//.test(brTransportProbe),false);
+  assert.equal(/https?:\/\/[^"' ]+/.test(brTransportProbe),false);
 });
