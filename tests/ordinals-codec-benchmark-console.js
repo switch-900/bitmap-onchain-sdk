@@ -23,6 +23,7 @@
     moduleImportMs: null,
     nativeBrotliStream: false,
     integrityMatch: false,
+    initialDecodeMs: {},
     firstDecodeMs: {},
     warmupsMs: {},
     warm: {},
@@ -87,14 +88,18 @@
     const brotliDecode = async () => asBytes(await oc.decompress(inputBr));
 
     // Validate both formats against one another and the previously reported SHA.
+    let initialStart=now();
     const gzReference = await gzipDecode();
+    report.initialDecodeMs = {gzip:rounded(now()-initialStart)};
     if (gzReference.length !== 1525 || await sha256(gzReference) !== EXPECTED_SHA)
       throw Error("Native gzip result failed the recorded 840000 SHA-256");
+    initialStart=now();
     const brReference = await brotliDecode();
+    report.initialDecodeMs.brotli = rounded(now()-initialStart);
     if (!compare(brReference,gzReference)) throw Error("Brotli and gzip bytes differ");
     report.integrityMatch = true;
-    // The reference decodes above intentionally trigger one-time codec setup.
-    // The firstDecodeMs below are FIRST measured calls after that initial verification.
+    // The first reference decode measures one-time setup. All subsequent
+    // measurements separately measure warmed-up invocation costs.
     report.firstDecodeMs.brotli = await measure(brotliDecode, gzReference, "Brotli first");
     report.firstDecodeMs.gzip = await measure(gzipDecode, gzReference, "Gzip first");
 
@@ -123,7 +128,8 @@
       { codec:"Gzip (native)", compressedBytes:inputGz.length, ...report.warm.gzip }
     ]);
     console.log("Exact integrity match:",report.integrityMatch);
-    console.log("First measured decodes (after verification):",report.firstDecodeMs);
+    console.log("Initial decodes (includes lazy setup):",report.initialDecodeMs);
+    console.log("First subsequent decodes:",report.firstDecodeMs);
     console.log("Full report: window.__bitmapCodecBenchmark840000");
     return report;
   } catch (err) {
