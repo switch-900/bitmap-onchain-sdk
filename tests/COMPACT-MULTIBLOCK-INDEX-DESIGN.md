@@ -214,7 +214,9 @@ patterns, with Brotli quality 11, complete record/byte roundtrips and checksum
 checks. The report exposes `fixtureRebuilt`, `rawHeightsFetched` and
 `fixtureRebuildMs`.
 The lean variant is for sizing only; it has NOT been integrated into SDK
-production lookups or trusted storage. Await measurements before choosing it.
+production lookups or trusted storage. Live browser measurements below now
+support investigating it further, but the directory and access model remain
+unresolved.
 
 ### Access-pattern decision still open
 
@@ -225,3 +227,47 @@ overhead but can hurt random access. Measure cold and warm fetch/decode,
 selection and index lookup, including directory metadata, before fixing
 32/64/128-block groups. Do not extrapolate from only three neighbouring
 heights.
+
+### Actual lean-format browser results (2026-10-20)
+
+The user verified the compact header comparison with **three real block
+patterns**, 839999, 840000 and 840001, preserving every packed value.
+
+| Format | Bytes before Brotli | Whole-bundle Brotli-11 | Three independently Brotli-compressed self-describing records |
+| --- | ---: | ---: | ---: |
+| v1: 76-byte records, each SHA-256 | 4,337 | **1,611** | 1,711 |
+| lean: 44-byte records, no per-record SHA-256 | 4,241 | **1,487** | 1,622 |
+
+All reported record roundtrips passed. The lean bundle saved **96 raw bytes**
+and **124 Brotli-compressed bytes (7.7%)** versus v1. A lean whole-bundle
+saves 135 bytes (8.3%) against three independently compressed lean records.
+
+Previously measured separately compressed **bare** patterns totaled **1,386
+bytes**, so the lean bundle still carries **101 bytes** of compressed metadata
+over bare patterns. This is not a fair finished-transport comparison:
+the bare option cannot identify its height/hash/count without a directory.
+
+The recorded whole-bundle SHA-256 anchor for the lean **uncompressed**
+binary is:
+
+`9cf4135b6c58fd399497dd7020523732e9f9d6bd38f1a85fb62593105e713636`
+
+For v1, the corresponding anchor is:
+
+`16cc024c98c8d749d2321df7d8a7855045891dd2c30abb408de5ef7364742281`
+
+These hashes were reported by the browser and have not been independently
+checked against downloaded original artifacts in this documentation update.
+
+**Architecture decision: keep this as an experimental candidate**. The
+44-byte record still includes four-byte height and four-byte explicit
+payload length. If storing *strictly contiguous* heights, the base height
+and record order could replace individual heights; packed length can be
+calculated from the transaction count. Such a redesign must be a distinct
+version with strict range bounds and malformed-data tests, not a silent
+reinterpretation of the existing lean-v2 prototype.
+
+The larger remaining costs are index discovery, directory references,
+chain-hash verification, whole-bundle transfer for single-height lookups,
+and cold browser loading. Do **not** inscribe or integrate the lean format
+into the trusted SDK cache merely because it is smaller.
