@@ -1342,7 +1342,7 @@ export async function getBitmapMondrian(bitmapNumber, {
         const cacheReadStarted = mondrianNow();
         cachedRecord = await storageGetMondrianSafe(bitmapNumber);
         reportMondrianStage(onTiming, "indexeddb-read", cacheReadStarted, { bitmapNumber });
-        if (cachedRecord?.patternSource === "verified-compact-pattern-cache") {
+        if ((cachedRecord?.patternSource ?? cachedRecord?.source) === "verified-compact-pattern-cache") {
             try {
                 staleCompactGeometry = !cachedRecord.blockHash ||
                     (await getBlockHash(bitmapNumber)) !== cachedRecord.blockHash;
