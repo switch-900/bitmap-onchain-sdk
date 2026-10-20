@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
 import { webcrypto } from "node:crypto";
+import { brotliDecompressSync } from "node:zlib";
 import { indexedDB, IDBKeyRange } from "fake-indexeddb";
 
 const HEIGHT = 840000;
@@ -175,4 +176,21 @@ test("Brotli manifests need native support or an explicit decoder, never silentl
     brotliDecoder: async()=>packed
   });
   assert.deepEqual(output.pattern,decoded.pattern);
+});
+
+
+test("real 840000 Brotli quality-11 fixture is 405 bytes and decodes to original SHA-256",async()=>{
+  const sdk=makeSDK().sdk;
+  // Compressed from the exact 1,525-byte packed pattern reported in the Ord viewer.
+  const payloadBase64="G/QFgIzDOBb8clOELZ7eJinAb9Ypn++L+NqquHMHSEABaVZJRay7eRA/wbaLR62FXEHoEZwhT/RpQn0nCUQDN9l40RkiwlX/gPiZpzr1+uB23DdFZmbO+96zuSylM7UgBaLKRGciTUu0xSJYpUJEB9TGniIk0NZEUwp+kCLFQGaAEmAti4ICSABPoRBUvYhADNWQZtFhpJVS2qg9CEPyyjPQolucQ1hHcyp2geWBsQUupCBHFQGgChxqavMgLsGNJRWtvo4loJIYICrQZGMpDIFugAUgwIF1gKPCAHsz6ROgRQBCyXQJmZmZsuSrZkauehngIAUh01zJAFaz0r3PzhQAVNkUIAAQOfD0G3/b5AEcLleQZOpPAEAHYOy1/UdR9Q6AZAAA8GRWPQoAax+/53EESMqANLD2EnvIr7Ytrn3eY2NmlZuZJmE8FcgCEABSSMHoi5/7b51j5uznnAL4mTqcA6VMOjPXDNJwrhO+dElnrTSkibLuca3Puj+vj1a/b01XA6PweXunWClsBAjVxJOhPvsA";
+  const manifest={
+    ...makeRealManifest(), compression:"brotli",
+    encodedBytes:405, payloadBase64
+  };
+  const unpacked=await sdk.decodeBitmapPatternManifest(manifest,{
+    brotliDecoder:async data=>new Uint8Array(brotliDecompressSync(data))
+  });
+  assert.equal(unpacked.pattern.length,3050);
+  assert.equal(unpacked.packedSha256,REAL_SHA);
+  assert.equal(unpacked.verifiedAgainstRawBlock,false);
 });
