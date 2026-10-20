@@ -344,15 +344,35 @@ For directly supplied size arrays, `packBitmapPattern(pattern)`,
 `getBitmapGeometryFromPattern(height, pattern, {includeEmptySpaces:true})`
 are also available.
 
-**Brotli compatibility:** Native `DecompressionStream("brotli")` is not
-supported in every browser, including some Chromium browsers.
-`decodeBitmapPatternManifest(manifest, {brotliDecoder})` accepts an
-explicit async callback returning a `Uint8Array`, permitting a separately
-verified recursive on-chain Brotli decoder. The core SDK does **not** bundle
-an off-chain decompression dependency. Generating Brotli with
-`getBitmapPatternManifest(...,{compression:"brotli"})` requires native
-`CompressionStream("brotli")` support; otherwise encode Brotli offline and
-supply it as an external manifest.
+**Brotli compatibility:** The SDK first probes native
+`DecompressionStream("brotli")` (or `CompressionStream("brotli")` for encoding).
+That particular JavaScript stream format differs from the browser's
+automatic decoding of `Content-Encoding: br` HTTP responses and is not
+available in every browser.
+
+Where the native stream format is unavailable, the SDK automatically
+reuses the already-inscribed Nexus BrotliOC module:
+`/content/fb483c53bc6938c1df1e25e03e99f726d08a1c0d2db4e0e644c0baf3526a1d60i0`.
+It exposes `globalThis.BrotliOC.compress(bytes, {quality:11})` and
+`globalThis.BrotliOC.decompress(bytes)`, and is lazy-loaded only when needed.
+If the host HTML has already loaded the classic script
+`/content/b1d16a7a1ada08b5c7f51837478f578c0abd0973809c439228f28ccd5c38e44ai0`
+and exposes `globalThis.BrotliDecode(bytes)`, the SDK can also reuse that
+decoder without another import. Both paths stay on the existing Ord
+`/content/` recursive origin. A separate 5ea902d20bbe... inscription URL
+was supplied but its runtime API has not yet been verified, so no dependency
+on that URL is introduced.
+
+An explicit `decodeBitmapPatternManifest(manifest, {brotliDecoder})`
+callback remains supported and takes priority over automatic selection.
+The module's compressed result is validated against the uncompressed
+pattern length, nibble range and SHA-256 before being accepted. No third-party
+CDN or separately bundled Brotli implementation is required.
+
+**Note:** Brotli-compressed *inscription content* using the Ord tag-9
+`content-encoding: br` mechanism is distinct from a Base64 Brotli
+field inside a JSON manifest. The latter requires the manifest decoding path
+described above; do not add a second Brotli layer accidentally.
 
 **Security and trust:** The manifest's SHA-256 authenticates nothing on its
 own if the publisher controls both the payload and checksum. A matching
