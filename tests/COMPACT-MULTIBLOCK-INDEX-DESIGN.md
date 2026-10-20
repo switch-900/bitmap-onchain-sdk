@@ -10,18 +10,27 @@ Status: **design/test only**, no approved inscription, deployment or production 
 - Reconstructed geometry has 3050 parcel slots and 48 empty spaces; captured block hash matches current Ord recursive `/r/blockhash/840000`.
 - Browser fetch of *a separate existing* Brotli-encoded inscription returned HTTP 200 and recognisable decoded HTML. **840000 pattern itself has NOT been inscribed.**
 
-## Critical discovery: the Bitmon pattern index already exists
+## Bitmon catalogue is intentionally selective — NOT a general Bitcoin-block index
 
-The SDK imports existing on-chain Mondrian/Bitmon module
-`55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0`,
-and calls `getPatternArray(height)` before falling back to raw block. Therefore do
-**not** assume each block needs a new index. First inspect whether original index
-covers target heights. Run `tests/ordinals-existing-pattern-coverage-console.js`
-from the same-origin Ord viewer and record index hits and misses. No `/r/block` fetch.
+The existing on-chain Mondrian/Bitmon module
+`55551557695dd82a2bda5ec3497684ec7cbb2cc1752ff5101accff1648666c3ai0`
+contains **Bitmon repeated-pattern entries only**. Its `getPatternArray(height)`
+provides a pattern for a block classified in that catalogue; an absent entry
+does **not** mean the Bitmon index has incomplete coverage or that its data
+needs backfilling. The old coverage probe merely checked whether the sample
+heights have catalogue entries.
 
-## Proposed design if uncovered blocks justify new bundles
+The general Bitmap problem is distinct: every Bitcoin block has a Mondrian
+layout derivable from its real output totals, regardless of whether it is a
+Bitmon. The compact multi-block project is a separate optional transport/
+cache for those general per-block patterns. It must not change Bitmon
+classification, overwrite the Bitmon catalogue, or treat a non-Bitmon as an
+indexing error.
 
-1. Reuse the canonical on-chain Bitmon index for its existing coverage; don't duplicate it.
+## Proposed design if enough general Bitmap demand justifies new bundles
+
+1. Preserve the existing Bitmon catalogue and its pattern lookup unchanged.
+   Never introduce general Bitcoin-block patterns into the Bitmon catalogue.
 2. Group a bounded run of **previously verified** Bitcoin block patterns into one
    immutable *bundle inscription* rather than inscribing individual patterns.
    Candidate sizes to benchmark: 32, 64 and 128 blocks; not a fixed choice yet.
@@ -59,7 +68,7 @@ from the same-origin Ord viewer and record index hits and misses. No `/r/block` 
 
 ## Acceptance tests before committing inscription fees
 
-- Inspect real existing Bitmon index coverage across old/new heights, especially 840000.
+- Preserve the semantic distinction between Bitmon repeated-pattern catalogue membership and general Bitcoin-block pattern availability.
 - Derive/verify patterns for several **different** real block heights before bundling.
 - Compare every packed value and occupied/gap coordinate against live canonical SDK
   layout (not just 3050/48 counts). Test odd transaction counts and malformed bounds.
@@ -69,24 +78,25 @@ from the same-origin Ord viewer and record index hits and misses. No `/r/block` 
   insertion to trusted cache in the browser plus the automated suite.
 - Obtain explicit user review of exact artifacts and fees before any on-chain write.
 
-## 2026-10-20 coverage and prototype update
+## 2026-10-20 Bitmon membership sample and prototype update
 
-Observed in the **same-origin Ord browser** (eight probes, not a random sample):
+Observed in the **same-origin Ord browser** (eight catalogue lookups, not a random sample):
 
-| Height | getPatternArray result |
+| Height | Bitmon catalogue lookup |
 | --- | --- |
-| 177700 | 6 sizes; index hit |
-| 500000 | missing |
-| 700000 | missing |
-| 767430 | missing |
-| 800000 | missing |
-| 840000 | missing |
-| 900000 | missing |
-| 960000 | missing |
+| 177700 | Has a repeated-pattern entry (6 sizes) |
+| 500000 | No entry |
+| 700000 | No entry |
+| 767430 | No entry |
+| 800000 | No entry |
+| 840000 | No entry |
+| 900000 | No entry |
+| 960000 | No entry |
 
-Do not extrapolate the 1/8 hit rate to all Bitcoin heights. It is enough to
-show that the existing Bitmon index does **not** supply the known real 840000
-pattern. Preserve that existing index as the first-party source where it hits.
+These results are expected for a **selective catalogue of repeated Bitmon
+patterns**. They are **not** a measure of missing general Bitmap data or
+incomplete Bitmon coverage. In particular, Bitmap 840000 has a valid,
+raw-derived pattern (3050 sizes) even though it has no Bitmon catalogue entry.
 
 A **non-production** deterministic binary format exists in
 [`experimental/compact-multiblock-v1.mjs`](../experimental/compact-multiblock-v1.mjs),
@@ -118,3 +128,13 @@ via the existing inscribed SDK's `getBitmapPattern(forceLive:true)`, builds
 one three-block bundle, checks each record, and compares Brotli 11 with
 native gzip. This experiment is read-only. Do not extrapolate three heights
 to overall network-wide performance.
+
+## Scope and inscription economics
+
+Do not automatically index every mined Bitcoin block on-chain. The current
+approach is an **optional, demand-driven accelerator** for general Bitmap
+geometry, with canonical live derivation and local caching retained for
+unindexed heights. Even compressed hundreds-of-bytes-per-block records become
+large and potentially costly across hundreds of thousands of blocks.
+The multi-block bundle prototype tests transport savings only; neither all-
+chain coverage nor a new canonical pointer is authorised or established.
